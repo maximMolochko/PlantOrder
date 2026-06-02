@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Мои Растения и Заказы</title>
     
-    <!-- Firebase SDK (App + Realtime Database) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
@@ -25,6 +24,7 @@
         button:active { transform: scale(0.98); }
         .btn-danger { background: var(--danger); padding: 8px; font-size: 14px; margin: 0; width: auto;}
         .btn-small { padding: 8px; font-size: 14px; width: auto; background: var(--accent);}
+        .btn-secondary { background: var(--grey); }
         .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;}
         .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white;}
         .status-pending { background: #f57c00; }
@@ -38,6 +38,46 @@
         .sync-ok { color: var(--primary); }
         .sync-error { color: var(--danger); }
         .sync-wait { color: #f57c00; }
+        
+        /* Новые стили для формы заказа */
+        .order-item { 
+            display: flex; 
+            gap: 8px; 
+            margin-bottom: 10px; 
+            padding: 10px; 
+            background: #f9f9f9; 
+            border-radius: 6px;
+            align-items: center;
+        }
+        .order-item select { flex: 2; margin-bottom: 0; }
+        .order-item input { flex: 1; margin-bottom: 0; min-width: 60px; }
+        .order-item .btn-remove { 
+            width: 40px; 
+            flex: 0 0 40px; 
+            padding: 8px; 
+            margin: 0;
+            font-size: 18px;
+            line-height: 1;
+        }
+        .btn-add-item { 
+            background: var(--accent); 
+            margin-bottom: 15px;
+            font-size: 14px;
+            padding: 10px;
+        }
+        .client-selector {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .client-selector label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--primary);
+        }
+        .client-selector select { margin-bottom: 0; }
     </style>
 </head>
 <body>
@@ -74,10 +114,19 @@
         <h1>📦 Заказы</h1>
         <div class="card">
             <h3>Новый заказ</h3>
-            <select id="order-client"></select>
-            <select id="order-plant"></select>
-            <input type="number" id="order-qty" placeholder="Количество" min="1" value="1">
-            <button id="btn-add-order">Создать заказ</button>
+            
+            <!-- Выбор клиента -->
+            <div class="client-selector">
+                <label>👤 Клиент:</label>
+                <select id="order-client"></select>
+            </div>
+            
+            <!-- Список растений для заказа -->
+            <label style="font-weight: bold; display: block; margin-bottom: 10px;">🌱 Растения в заказе:</label>
+            <div id="order-items-container"></div>
+            
+            <button id="btn-add-item" class="btn-add-item">➕ Добавить растение</button>
+            <button id="btn-add-order">✅ Создать заказы</button>
         </div>
 
         <div class="controls">
@@ -108,36 +157,31 @@
         // ============================================
         // ВСТАВЬТЕ СЮДА СВОЮ КОНФИГУРАЦИЮ FIREBASE
         // ============================================
-        const firebaseConfig = {  
+        const firebaseConfig = {
             apiKey: "AIzaSyC2UyhWjiI_y7vBSHSBRmwyKsjwj0b3iYA",
             authDomain: "garden-orders.firebaseapp.com",
             projectId: "garden-orders",
             storageBucket: "garden-orders.firebasestorage.app",
             messagingSenderId: "907542509265",
-            appId: "1:907542509265:web:224c71edf6f51b7ab9f7f0",            
-            databaseURL: "https://garden-orders-default-rtdb.europe-west1.firebasedatabase.app/"             
-      };
+            appId: "1:907542509265:web:224c71edf6f51b7ab9f7f0",
+            databaseURL: "https://garden-orders-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
         // ============================================
 
-        // Инициализация Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         
-        // Данные в памяти
         let clients = [];
         let plants  = [];
         let orders  = [];
 
-        // Индикатор синхронизации
         function setSyncStatus(status, message) {
             const el = document.getElementById('sync-status');
             el.className = 'sync-status sync-' + status;
             el.textContent = message;
         }
 
-        // --- ПОДПИСКИ НА ИЗМЕНЕНИЯ В REALTIME DATABASE ---
-        
-        // Клиенты
+        // --- ПОДПИСКИ НА FIREBASE ---
         db.ref('clients').on('value', (snapshot) => {
             clients = [];
             const data = snapshot.val();
@@ -151,12 +195,8 @@
             if(document.getElementById('view-orders').classList.contains('active')) {
                 updateClientSelect();
             }
-        }, (error) => {
-            console.error('Ошибка:', error);
-            setSyncStatus('error', '❌ Ошибка синхр.');
         });
 
-        // Растения
         db.ref('plants').on('value', (snapshot) => {
             plants = [];
             const data = snapshot.val();
@@ -167,11 +207,10 @@
             }
             renderPlants();
             if(document.getElementById('view-orders').classList.contains('active')) {
-                updatePlantSelect();
+                updateOrderItems();
             }
         });
 
-        // Заказы
         db.ref('orders').on('value', (snapshot) => {
             orders = [];
             const data = snapshot.val();
@@ -194,7 +233,7 @@
             if(tab === 'plants')  renderPlants();
             if(tab === 'orders') {
                 updateClientSelect();
-                updatePlantSelect();
+                updateOrderItems();
                 renderOrders();
             }
         }
@@ -204,30 +243,24 @@
             const name  = document.getElementById('client-name').value.trim();
             const phone = document.getElementById('client-phone').value.trim();
             if(!name) { alert('Введите имя клиента'); return; }
-            
             if(clients.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-                alert('Такой клиент уже есть в справочнике');
+                alert('Такой клиент уже есть');
                 return;
             }
-
             const id = Date.now();
             db.ref('clients/' + id).set({
-                name: name,
-                phone: phone,
-                createdAt: new Date().toISOString()
+                name: name, phone: phone, createdAt: new Date().toISOString()
             }).then(() => {
                 document.getElementById('client-name').value = '';
                 document.getElementById('client-phone').value = '';
                 setSyncStatus('ok', '✅ Сохранено');
-            }).catch(error => {
-                alert('Ошибка: ' + error.message);
-            });
+            }).catch(error => alert('Ошибка: ' + error.message));
         }
 
         function deleteClient(id) {
             const hasOrders = orders.some(o => o.clientId === id);
             const msg = hasOrders 
-                ? 'У этого клиента есть заказы. Удалить клиента? Заказы останутся с пометкой "Удалённый клиент".' 
+                ? 'У клиента есть заказы. Удалить? Заказы останутся с пометкой "Удалённый клиент".' 
                 : 'Удалить клиента?';
             if(confirm(msg)) {
                 db.ref('clients/' + id).remove()
@@ -260,22 +293,18 @@
         function addPlant() {
             const name = document.getElementById('plant-name').value.trim();
             if(!name) { alert('Введите название'); return; }
-            
             const id = Date.now();
             db.ref('plants/' + id).set({
-                name: name,
-                createdAt: new Date().toISOString()
+                name: name, createdAt: new Date().toISOString()
             }).then(() => {
                 document.getElementById('plant-name').value = '';
                 setSyncStatus('ok', '✅ Сохранено');
-            }).catch(error => {
-                alert('Ошибка: ' + error.message);
-            });
+            }).catch(error => alert('Ошибка: ' + error.message));
         }
 
         function deletePlant(id) {
             const hasOrders = orders.some(o => o.plantId === id);
-            const msg = hasOrders ? 'У этого растения есть заказы. Удалить растение?' : 'Удалить растение?';
+            const msg = hasOrders ? 'У растения есть заказы. Удалить?' : 'Удалить растение?';
             if(confirm(msg)) {
                 db.ref('plants/' + id).remove()
                 .then(() => setSyncStatus('ok', '✅ Удалено'))
@@ -299,7 +328,8 @@
             `).join('');
         }
 
-        // --- ЗАКАЗЫ ---
+        // --- ЗАКАЗЫ (НОВАЯ ЛОГИКА) ---
+        
         function updateClientSelect() {
             const select = document.getElementById('order-client');
             if(clients.length === 0) {
@@ -311,41 +341,132 @@
                 sorted.map(c => `<option value="${c.id}">${c.name}${c.phone ? ' ('+c.phone+')' : ''}</option>`).join('');
         }
 
-        function updatePlantSelect() {
-            const select = document.getElementById('order-plant');
-            if(plants.length === 0) {
-                select.innerHTML = '<option value="">⚠️ Сначала добавьте растение</option>';
+        // Генерация HTML для одной строки "растение + количество"
+        function createOrderItemHTML(index = 0) {
+            const plantOptions = plants.length === 0 
+                ? '<option value="">Нет растений</option>'
+                : '<option value="">— Выберите растение —</option>' + 
+                  plants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            
+            return `
+                <div class="order-item" data-item-index="${index}">
+                    <select class="item-plant">${plantOptions}</select>
+                    <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="1">
+                    <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>
+                </div>
+            `;
+        }
+
+        function updateOrderItems() {
+            const container = document.getElementById('order-items-container');
+            // Если контейнер пуст — добавляем одну строку
+            if (container.children.length === 0) {
+                container.innerHTML = createOrderItemHTML(0);
+            } else {
+                // Обновляем списки растений во всех существующих строках
+                const items = container.querySelectorAll('.order-item');
+                items.forEach((item, index) => {
+                    const currentPlantId = item.querySelector('.item-plant').value;
+                    const currentQty = item.querySelector('.item-qty').value;
+                    
+                    const plantOptions = plants.length === 0 
+                        ? '<option value="">Нет растений</option>'
+                        : '<option value="">— Выберите растение —</option>' + 
+                          plants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                    
+                    item.innerHTML = `
+                        <select class="item-plant">${plantOptions}</select>
+                        <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="${currentQty || 1}">
+                        <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>
+                    `;
+                    
+                    // Восстанавливаем выбранное растение
+                    if (currentPlantId) {
+                        item.querySelector('.item-plant').value = currentPlantId;
+                    }
+                });
+            }
+        }
+
+        function addOrderItem() {
+            const container = document.getElementById('order-items-container');
+            const newIndex = container.children.length;
+            container.insertAdjacentHTML('beforeend', createOrderItemHTML(newIndex));
+            // Обновляем индексы у всех кнопок удаления
+            updateRemoveButtons();
+        }
+
+        function removeOrderItem(index) {
+            const container = document.getElementById('order-items-container');
+            if (container.children.length <= 1) {
+                alert('Должна остаться хотя бы одна позиция');
                 return;
             }
-            select.innerHTML = '<option value="">— Выберите растение —</option>' + 
-                plants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            container.children[index].remove();
+            updateRemoveButtons();
+        }
+
+        function updateRemoveButtons() {
+            const items = document.querySelectorAll('.order-item');
+            items.forEach((item, index) => {
+                item.setAttribute('data-item-index', index);
+                const btn = item.querySelector('.btn-remove');
+                if (btn) btn.setAttribute('data-remove-item', index);
+            });
         }
 
         function addOrder() {
             const clientId = parseInt(document.getElementById('order-client').value);
-            const plantId  = parseInt(document.getElementById('order-plant').value);
-            const qty      = parseInt(document.getElementById('order-qty').value);
-            
-            if(!clientId || !plantId || !qty) { 
-                alert('Заполните все поля'); 
+            if(!clientId) { 
+                alert('Выберите клиента'); 
                 return; 
             }
 
-            const id = Date.now();
-            db.ref('orders/' + id).set({
-                clientId: clientId,
-                plantId: plantId,
-                qty: qty,
-                status: 'pending',
-                date: new Date().toISOString()
-            }).then(() => {
-                document.getElementById('order-qty').value = '1';
-                document.getElementById('order-client').value = '';
-                document.getElementById('order-plant').value = '';
-                setSyncStatus('ok', '✅ Заказ создан');
-            }).catch(error => {
-                alert('Ошибка: ' + error.message);
+            // Собираем все позиции
+            const items = document.querySelectorAll('.order-item');
+            const orderItems = [];
+            
+            for (const item of items) {
+                const plantId = parseInt(item.querySelector('.item-plant').value);
+                const qty = parseInt(item.querySelector('.item-qty').value);
+                
+                if(!plantId || !qty || qty < 1) {
+                    alert('Заполните все позиции: выберите растение и укажите количество');
+                    return;
+                }
+                orderItems.push({ plantId, qty });
+            }
+
+            if(orderItems.length === 0) {
+                alert('Добавьте хотя бы одно растение');
+                return;
+            }
+
+            // Создаём несколько заказов с одним клиентом и одной датой
+            const baseDate = new Date().toISOString();
+            const batchId = Date.now(); // общий ID для группы заказов
+            
+            const promises = orderItems.map((item, index) => {
+                const orderId = batchId + index;
+                return db.ref('orders/' + orderId).set({
+                    clientId: clientId,
+                    plantId: item.plantId,
+                    qty: item.qty,
+                    status: 'pending',
+                    date: baseDate,
+                    batchId: batchId  // маркер группы
+                });
             });
+
+            Promise.all(promises)
+                .then(() => {
+                    setSyncStatus('ok', `✅ Создано заказов: ${orderItems.length}`);
+                    // Сбрасываем форму
+                    document.getElementById('order-client').value = '';
+                    document.getElementById('order-items-container').innerHTML = createOrderItemHTML(0);
+                    updateRemoveButtons();
+                })
+                .catch(error => alert('Ошибка: ' + error.message));
         }
 
         function toggleStatus(id) {
@@ -353,6 +474,7 @@
             const newStatus = order.status === 'pending' ? 'done' : 'pending';
             const updateData = { status: newStatus };
             if(newStatus === 'done') updateData.completedDate = new Date().toISOString();
+            else updateData.completedDate = null;
             
             db.ref('orders/' + id).update(updateData)
             .then(() => setSyncStatus('ok', '✅ Обновлено'))
@@ -390,16 +512,34 @@
                 return; 
             }
 
-            list.innerHTML = filtered.map(o => {
+            // Группируем заказы по batchId для визуального выделения
+            let currentBatchId = null;
+            let html = '';
+            
+            filtered.forEach(o => {
                 const client = clients.find(c => c.id === o.clientId);
                 const plant  = plants.find(p => p.id === o.plantId);
                 const clientName = client ? client.name : '🚫 Удалённый клиент';
                 const plantName  = plant  ? plant.name  : '🚫 Удалённое растение';
                 const dateStr = new Date(o.date).toLocaleDateString('ru-RU');
+                const timeStr = new Date(o.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
                 const statusClass = o.status === 'done' ? 'status-done' : 'status-pending';
                 const statusText = o.status === 'done' ? 'Выполнен' : 'В работе';
+                
+                // Показываем разделитель между группами
+                const showGroupHeader = o.batchId && o.batchId !== currentBatchId;
+                if (showGroupHeader) {
+                    currentBatchId = o.batchId;
+                    // Считаем сколько заказов в этой группе
+                    const groupCount = filtered.filter(x => x.batchId === o.batchId).length;
+                    if (groupCount > 1) {
+                        html += `<div style="margin: 15px 0 5px 0; color: var(--accent); font-size: 13px; font-weight: bold;">
+                            📋 Группа заказов (${groupCount} шт.) — ${clientName}, ${dateStr} ${timeStr}
+                        </div>`;
+                    }
+                }
 
-                return `
+                html += `
                     <div class="card">
                         <div class="order-header">
                             <strong>${clientName}</strong>
@@ -407,7 +547,7 @@
                         </div>
                         <div style="margin-bottom: 10px; color: var(--grey); font-size: 14px;">
                             🌱 ${plantName} | Кол-во: ${o.qty}<br>
-                            📅 ${dateStr}
+                            📅 ${dateStr} ${timeStr}
                         </div>
                         <div style="display: flex; gap: 10px;">
                             <button class="btn-small" data-toggle="${o.id}" style="flex:1;">
@@ -417,7 +557,9 @@
                         </div>
                     </div>
                 `;
-            }).join('');
+            });
+            
+            list.innerHTML = html;
         }
 
         // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
@@ -429,7 +571,12 @@
             if(e.target.id === 'btn-add-client') { addClient(); return; }
             if(e.target.id === 'btn-add-plant')  { addPlant();  return; }
             if(e.target.id === 'btn-add-order')  { addOrder();  return; }
+            if(e.target.id === 'btn-add-item')   { addOrderItem(); return; }
             
+            if(e.target.hasAttribute('data-remove-item')) {
+                removeOrderItem(parseInt(e.target.getAttribute('data-remove-item')));
+                return;
+            }
             if(e.target.hasAttribute('data-delete-client')) {
                 deleteClient(parseInt(e.target.getAttribute('data-delete-client')));
                 return;
