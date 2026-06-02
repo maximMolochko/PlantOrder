@@ -29,8 +29,8 @@
         .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white;}
         .status-pending { background: #f57c00; }
         .status-done { background: #388e3c; }
-        .controls { display: flex; gap: 10px; margin-bottom: 15px;}
-        .controls select { margin-bottom: 0; flex: 1;}
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;}
+        .controls select { margin-bottom: 0; flex: 1; min-width: 120px;}
         .empty { text-align: center; color: var(--grey); padding: 20px;}
         .client-row { display: flex; justify-content: space-between; align-items: center; }
         .client-phone { color: var(--grey); font-size: 14px; }
@@ -39,7 +39,6 @@
         .sync-error { color: var(--danger); }
         .sync-wait { color: #f57c00; }
         
-        /* Новые стили для формы заказа */
         .order-item { 
             display: flex; 
             gap: 8px; 
@@ -78,6 +77,32 @@
             color: var(--primary);
         }
         .client-selector select { margin-bottom: 0; }
+        
+        /* Стили для группировки */
+        .group-header {
+            background: var(--primary);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin: 20px 0 10px 0;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .group-subheader {
+            background: #e8f5e9;
+            color: var(--primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 10px 0 8px 0;
+            font-weight: bold;
+            font-size: 14px;
+            border-left: 4px solid var(--primary);
+        }
+        .group-item {
+            margin-left: 15px;
+            border-left: 3px solid #e0e0e0;
+            padding-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -115,13 +140,11 @@
         <div class="card">
             <h3>Новый заказ</h3>
             
-            <!-- Выбор клиента -->
             <div class="client-selector">
                 <label>👤 Клиент:</label>
                 <select id="order-client"></select>
             </div>
             
-            <!-- Список растений для заказа -->
             <label style="font-weight: bold; display: block; margin-bottom: 10px;">🌱 Растения в заказе:</label>
             <div id="order-items-container"></div>
             
@@ -137,9 +160,14 @@
                 <option value="client">По клиенту</option>
             </select>
             <select id="filter-status">
-                <option value="all">Все статусы</option>
                 <option value="pending">В работе</option>
                 <option value="done">Выполнены</option>
+                <option value="all">Все статусы</option>
+            </select>
+            <select id="group-by">
+                <option value="none">Без группировки</option>
+                <option value="plant">По растениям</option>
+                <option value="client">По клиентам</option>
             </select>
         </div>
 
@@ -154,9 +182,6 @@
     </div>
 
     <script>
-        // ============================================
-        // ВСТАВЬТЕ СЮДА СВОЮ КОНФИГУРАЦИЮ FIREBASE
-        // ============================================
         const firebaseConfig = {
             apiKey: "AIzaSyC2UyhWjiI_y7vBSHSBRmwyKsjwj0b3iYA",
             authDomain: "garden-orders.firebaseapp.com",
@@ -166,7 +191,6 @@
             appId: "1:907542509265:web:224c71edf6f51b7ab9f7f0",
             databaseURL: "https://garden-orders-default-rtdb.europe-west1.firebasedatabase.app/"
         };
-        // ============================================
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
@@ -181,7 +205,6 @@
             el.textContent = message;
         }
 
-        // --- ПОДПИСКИ НА FIREBASE ---
         db.ref('clients').on('value', (snapshot) => {
             clients = [];
             const data = snapshot.val();
@@ -222,7 +245,6 @@
             renderOrders();
         });
 
-        // --- НАВИГАЦИЯ ---
         function switchTab(tab) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -238,7 +260,6 @@
             }
         }
 
-        // --- КЛИЕНТЫ ---
         function addClient() {
             const name  = document.getElementById('client-name').value.trim();
             const phone = document.getElementById('client-phone').value.trim();
@@ -289,7 +310,6 @@
             `).join('');
         }
 
-        // --- РАСТЕНИЯ ---
         function addPlant() {
             const name = document.getElementById('plant-name').value.trim();
             if(!name) { alert('Введите название'); return; }
@@ -328,8 +348,6 @@
             `).join('');
         }
 
-        // --- ЗАКАЗЫ (НОВАЯ ЛОГИКА) ---
-        
         function updateClientSelect() {
             const select = document.getElementById('order-client');
             if(clients.length === 0) {
@@ -341,7 +359,6 @@
                 sorted.map(c => `<option value="${c.id}">${c.name}${c.phone ? ' ('+c.phone+')' : ''}</option>`).join('');
         }
 
-        // Генерация HTML для одной строки "растение + количество"
         function createOrderItemHTML(index = 0) {
             const plantOptions = plants.length === 0 
                 ? '<option value="">Нет растений</option>'
@@ -359,11 +376,9 @@
 
         function updateOrderItems() {
             const container = document.getElementById('order-items-container');
-            // Если контейнер пуст — добавляем одну строку
             if (container.children.length === 0) {
                 container.innerHTML = createOrderItemHTML(0);
             } else {
-                // Обновляем списки растений во всех существующих строках
                 const items = container.querySelectorAll('.order-item');
                 items.forEach((item, index) => {
                     const currentPlantId = item.querySelector('.item-plant').value;
@@ -380,7 +395,6 @@
                         <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>
                     `;
                     
-                    // Восстанавливаем выбранное растение
                     if (currentPlantId) {
                         item.querySelector('.item-plant').value = currentPlantId;
                     }
@@ -392,7 +406,6 @@
             const container = document.getElementById('order-items-container');
             const newIndex = container.children.length;
             container.insertAdjacentHTML('beforeend', createOrderItemHTML(newIndex));
-            // Обновляем индексы у всех кнопок удаления
             updateRemoveButtons();
         }
 
@@ -422,7 +435,6 @@
                 return; 
             }
 
-            // Собираем все позиции
             const items = document.querySelectorAll('.order-item');
             const orderItems = [];
             
@@ -442,9 +454,8 @@
                 return;
             }
 
-            // Создаём несколько заказов с одним клиентом и одной датой
             const baseDate = new Date().toISOString();
-            const batchId = Date.now(); // общий ID для группы заказов
+            const batchId = Date.now();
             
             const promises = orderItems.map((item, index) => {
                 const orderId = batchId + index;
@@ -454,14 +465,13 @@
                     qty: item.qty,
                     status: 'pending',
                     date: baseDate,
-                    batchId: batchId  // маркер группы
+                    batchId: batchId
                 });
             });
 
             Promise.all(promises)
                 .then(() => {
                     setSyncStatus('ok', `✅ Создано заказов: ${orderItems.length}`);
-                    // Сбрасываем форму
                     document.getElementById('order-client').value = '';
                     document.getElementById('order-items-container').innerHTML = createOrderItemHTML(0);
                     updateRemoveButtons();
@@ -492,6 +502,7 @@
         function renderOrders() {
             const sortBy = document.getElementById('sort-by').value;
             const filter = document.getElementById('filter-status').value;
+            const groupBy = document.getElementById('group-by').value;
             
             let filtered = orders.filter(o => filter === 'all' || o.status === filter);
 
@@ -512,57 +523,120 @@
                 return; 
             }
 
-            // Группируем заказы по batchId для визуального выделения
-            let currentBatchId = null;
             let html = '';
-            
-            filtered.forEach(o => {
-                const client = clients.find(c => c.id === o.clientId);
-                const plant  = plants.find(p => p.id === o.plantId);
-                const clientName = client ? client.name : '🚫 Удалённый клиент';
-                const plantName  = plant  ? plant.name  : '🚫 Удалённое растение';
-                const dateStr = new Date(o.date).toLocaleDateString('ru-RU');
-                const timeStr = new Date(o.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
-                const statusClass = o.status === 'done' ? 'status-done' : 'status-pending';
-                const statusText = o.status === 'done' ? 'Выполнен' : 'В работе';
-                
-                // Показываем разделитель между группами
-                const showGroupHeader = o.batchId && o.batchId !== currentBatchId;
-                if (showGroupHeader) {
-                    currentBatchId = o.batchId;
-                    // Считаем сколько заказов в этой группе
-                    const groupCount = filtered.filter(x => x.batchId === o.batchId).length;
-                    if (groupCount > 1) {
-                        html += `<div style="margin: 15px 0 5px 0; color: var(--accent); font-size: 13px; font-weight: bold;">
-                            📋 Группа заказов (${groupCount} шт.) — ${clientName}, ${dateStr} ${timeStr}
-                        </div>`;
-                    }
-                }
 
-                html += `
-                    <div class="card">
-                        <div class="order-header">
-                            <strong>${clientName}</strong>
-                            <span class="status ${statusClass}">${statusText}</span>
-                        </div>
-                        <div style="margin-bottom: 10px; color: var(--grey); font-size: 14px;">
-                            🌱 ${plantName} | Кол-во: ${o.qty}<br>
-                            📅 ${dateStr} ${timeStr}
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button class="btn-small" data-toggle="${o.id}" style="flex:1;">
-                                ${o.status === 'done' ? '↩️ В работу' : '✅ Выполнить'}
-                            </button>
-                            <button class="btn-danger" data-delete-order="${o.id}">🗑️</button>
-                        </div>
-                    </div>
-                `;
-            });
-            
+            // Группировка по растениям
+            if (groupBy === 'plant') {
+                const groupedByPlant = {};
+                filtered.forEach(o => {
+                    if (!groupedByPlant[o.plantId]) groupedByPlant[o.plantId] = [];
+                    groupedByPlant[o.plantId].push(o);
+                });
+
+                Object.keys(groupedByPlant).forEach(plantId => {
+                    const plant = plants.find(p => p.id === parseInt(plantId));
+                    const plantName = plant ? plant.name : '🚫 Удалённое растение';
+                    const plantOrders = groupedByPlant[plantId];
+
+                    html += `<div class="group-header">🌱 ${plantName} (${plantOrders.length} заказ${plantOrders.length > 1 ? (plantOrders.length < 5 ? 'а' : 'ов') : ''})</div>`;
+
+                    // Группируем по клиентам внутри растения
+                    const groupedByClient = {};
+                    plantOrders.forEach(o => {
+                        if (!groupedByClient[o.clientId]) groupedByClient[o.clientId] = [];
+                        groupedByClient[o.clientId].push(o);
+                    });
+
+                    Object.keys(groupedByClient).forEach(clientId => {
+                        const client = clients.find(c => c.id === parseInt(clientId));
+                        const clientName = client ? client.name : '🚫 Удалённый клиент';
+                        const clientOrders = groupedByClient[clientId];
+
+                        html += `<div class="group-subheader">👤 ${clientName}</div>`;
+
+                        clientOrders.forEach(o => {
+                            html += renderOrderCard(o, true);
+                        });
+                    });
+                });
+            }
+            // Группировка по клиентам
+            else if (groupBy === 'client') {
+                const groupedByClient = {};
+                filtered.forEach(o => {
+                    if (!groupedByClient[o.clientId]) groupedByClient[o.clientId] = [];
+                    groupedByClient[o.clientId].push(o);
+                });
+
+                Object.keys(groupedByClient).forEach(clientId => {
+                    const client = clients.find(c => c.id === parseInt(clientId));
+                    const clientName = client ? client.name : '🚫 Удалённый клиент';
+                    const clientOrders = groupedByClient[clientId];
+
+                    html += `<div class="group-header">👤 ${clientName} (${clientOrders.length} заказ${clientOrders.length > 1 ? (clientOrders.length < 5 ? 'а' : 'ов') : ''})</div>`;
+
+                    // Группируем по растениям внутри клиента
+                    const groupedByPlant = {};
+                    clientOrders.forEach(o => {
+                        if (!groupedByPlant[o.plantId]) groupedByPlant[o.plantId] = [];
+                        groupedByPlant[o.plantId].push(o);
+                    });
+
+                    Object.keys(groupedByPlant).forEach(plantId => {
+                        const plant = plants.find(p => p.id === parseInt(plantId));
+                        const plantName = plant ? plant.name : '🚫 Удалённое растение';
+                        const plantOrders = groupedByPlant[plantId];
+
+                        html += `<div class="group-subheader">🌱 ${plantName}</div>`;
+
+                        plantOrders.forEach(o => {
+                            html += renderOrderCard(o, true);
+                        });
+                    });
+                });
+            }
+            // Без группировки
+            else {
+                filtered.forEach(o => {
+                    html += renderOrderCard(o, false);
+                });
+            }
+
             list.innerHTML = html;
         }
 
-        // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+        function renderOrderCard(order, isGrouped) {
+            const client = clients.find(c => c.id === order.clientId);
+            const plant  = plants.find(p => p.id === order.plantId);
+            const clientName = client ? client.name : '🚫 Удалённый клиент';
+            const plantName  = plant  ? plant.name  : '🚫 Удалённое растение';
+            const dateStr = new Date(order.date).toLocaleDateString('ru-RU');
+            const timeStr = new Date(order.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+            const statusClass = order.status === 'done' ? 'status-done' : 'status-pending';
+            const statusText = order.status === 'done' ? 'Выполнен' : 'В работе';
+
+            const className = isGrouped ? 'card group-item' : 'card';
+
+            return `
+                <div class="${className}">
+                    <div class="order-header">
+                        <strong>${isGrouped ? `Кол-во: ${order.qty}` : clientName}</strong>
+                        <span class="status ${statusClass}">${statusText}</span>
+                    </div>
+                    <div style="margin-bottom: 10px; color: var(--grey); font-size: 14px;">
+                        ${!isGrouped ? `🌱 ${plantName} | Кол-во: ${order.qty}<br>` : ''}
+                        📅 ${dateStr} ${timeStr}
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-small" data-toggle="${order.id}" style="flex:1;">
+                            ${order.status === 'done' ? '↩️ В работу' : '✅ Выполнить'}
+                        </button>
+                        <button class="btn-danger" data-delete-order="${order.id}">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }
+
         document.addEventListener('click', function(e) {
             if(e.target.classList.contains('tab')) {
                 switchTab(e.target.getAttribute('data-tab'));
@@ -597,6 +671,7 @@
 
         document.getElementById('sort-by').addEventListener('change', renderOrders);
         document.getElementById('filter-status').addEventListener('change', renderOrders);
+        document.getElementById('group-by').addEventListener('change', renderOrders);
     </script>
 </body>
 </html>
