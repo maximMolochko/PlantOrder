@@ -360,10 +360,11 @@
         }
 
         function createOrderItemHTML(index = 0) {
+            const sortedPlants = [...plants].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
             const plantOptions = plants.length === 0 
                 ? '<option value="">Нет растений</option>'
                 : '<option value="">— Выберите растение —</option>' + 
-                  plants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                  sortedPlants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
             
             return `
                 <div class="order-item" data-item-index="${index}">
@@ -376,6 +377,8 @@
 
         function updateOrderItems() {
             const container = document.getElementById('order-items-container');
+            const sortedPlants = [...plants].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
+            
             if (container.children.length === 0) {
                 container.innerHTML = createOrderItemHTML(0);
             } else {
@@ -387,7 +390,7 @@
                     const plantOptions = plants.length === 0 
                         ? '<option value="">Нет растений</option>'
                         : '<option value="">— Выберите растение —</option>' + 
-                          plants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                          sortedPlants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
                     
                     item.innerHTML = `
                         <select class="item-plant">${plantOptions}</select>
