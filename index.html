@@ -9,7 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
     <style>
-        :root { --primary: #2e7d32; --bg: #f5f5f5; --card: #fff; --text: #333; --danger: #d32f2f; --grey: #757575; --accent: #1976d2; }
+        :root { --primary: #2e7d32; --bg: #f5f5f5; --card: #fff; --text: #333; --danger: #d32f2f; --grey: #757575; --accent: #1976d2; --money: #f57c00; --edit-bg: #fff3e0; }
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; padding-bottom: 90px; }
         h1, h2 { color: var(--primary); margin-top: 0; }
@@ -23,8 +23,11 @@
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button:active { transform: scale(0.98); }
         .btn-danger { background: var(--danger); padding: 8px; font-size: 14px; margin: 0; width: auto;}
+        .btn-edit { background: var(--accent); padding: 8px; font-size: 14px; margin: 0; width: auto;}
         .btn-small { padding: 8px; font-size: 14px; width: auto; background: var(--accent);}
-        .btn-secondary { background: var(--grey); }
+        .btn-secondary { background: var(--grey); padding: 8px; font-size: 14px; width: auto;}
+        .btn-cancel { background: var(--grey); display: none; }
+        
         .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;}
         .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white;}
         .status-pending { background: #f57c00; }
@@ -32,79 +35,41 @@
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;}
         .controls select { margin-bottom: 0; flex: 1; min-width: 120px;}
         .empty { text-align: center; color: var(--grey); padding: 20px;}
-        .client-row { display: flex; justify-content: space-between; align-items: center; }
+        .client-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .client-phone { color: var(--grey); font-size: 14px; }
+        .plant-price { color: var(--money); font-weight: bold; font-size: 14px; }
         .sync-status { position: fixed; top: 10px; right: 10px; padding: 5px 10px; background: #fff; border-radius: 20px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 200; }
         .sync-ok { color: var(--primary); }
         .sync-error { color: var(--danger); }
         .sync-wait { color: #f57c00; }
         
-        .order-item { 
-            display: flex; 
-            gap: 8px; 
-            margin-bottom: 10px; 
-            padding: 10px; 
-            background: #f9f9f9; 
-            border-radius: 6px;
-            align-items: center;
-        }
-        .order-item select { flex: 2; margin-bottom: 0; }
+        .order-item { display: flex; gap: 8px; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 6px; align-items: center; flex-wrap: wrap; }
+        .order-item select { flex: 2; margin-bottom: 0; min-width: 120px; }
         .order-item input { flex: 1; margin-bottom: 0; min-width: 60px; }
-        .order-item .btn-remove { 
-            width: 40px; 
-            flex: 0 0 40px; 
-            padding: 8px; 
-            margin: 0;
-            font-size: 18px;
-            line-height: 1;
-        }
-        .btn-add-item { 
-            background: var(--accent); 
-            margin-bottom: 15px;
-            font-size: 14px;
-            padding: 10px;
-        }
-        .client-selector {
-            background: #e8f5e9;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-        }
-        .client-selector label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: var(--primary);
-        }
-        .client-selector select { margin-bottom: 0; }
+        .order-item .btn-remove { width: 40px; flex: 0 0 40px; padding: 8px; margin: 0; font-size: 18px; line-height: 1; }
+        .btn-add-item { background: var(--accent); margin-bottom: 15px; font-size: 14px; padding: 10px; }
         
-        /* Стили для группировки */
-        .group-header {
-            background: var(--primary);
-            color: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            margin: 20px 0 10px 0;
-            font-weight: bold;
-            font-size: 16px;
-        }
-        .group-subheader {
-            background: #e8f5e9;
-            color: var(--primary);
-            padding: 8px 12px;
-            border-radius: 6px;
-            margin: 10px 0 8px 0;
-            font-weight: bold;
-            font-size: 14px;
-            border-left: 4px solid var(--primary);
-        }
-        .group-item {
-            margin-left: 15px;
-            border-left: 3px solid #e0e0e0;
-            padding-left: 10px;
-        }
+        .form-container { transition: background 0.3s; padding: 15px; border-radius: 8px; }
+        .form-container.editing { background: var(--edit-bg); border: 2px solid var(--money); }
+        
+        .group-header { background: var(--primary); color: white; padding: 12px 15px; border-radius: 8px; margin: 20px 0 10px 0; font-weight: bold; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .group-header .sum { background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px; font-size: 14px; }
+        .group-subheader { background: #e8f5e9; color: var(--primary); padding: 8px 12px; border-radius: 6px; margin: 10px 0 8px 0; font-weight: bold; font-size: 14px; border-left: 4px solid var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        .group-subheader .sum { color: var(--money); font-size: 13px; }
+        .group-item { margin-left: 15px; border-left: 3px solid #e0e0e0; padding-left: 10px; }
+        .total-sum { background: var(--money); color: white; padding: 12px 15px; border-radius: 8px; margin: 15px 0; font-weight: bold; font-size: 16px; text-align: center; }
+        .order-price { color: var(--money); font-weight: bold; }
+
+        /* Стили для формы редактирования заказа */
+        .edit-order-form { background: var(--edit-bg); padding: 12px; border-radius: 6px; border: 2px solid var(--money); }
+        .edit-order-form label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; margin-top: 8px; }
+        .edit-order-form label:first-child { margin-top: 0; }
+        .edit-order-form select, .edit-order-form input { margin-bottom: 8px; }
+        .edit-order-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .edit-order-actions button { flex: 1; margin-bottom: 0; }
+    }
     </style>
-</head>
+    </head>
 <body>
 
     <div id="sync-status" class="sync-status sync-wait">⏳ Подключение...</div>
@@ -112,11 +77,14 @@
     <!-- ВКЛАДКА: КЛИЕНТЫ -->
     <div id="view-clients" class="view active">
         <h1>👥 Клиенты</h1>
-        <div class="card">
-            <h3>Добавить клиента</h3>
+        <div id="client-form-container" class="card form-container">
+            <h3 id="client-form-title">Добавить клиента</h3>
             <input type="text" id="client-name" placeholder="Имя клиента">
             <input type="tel" id="client-phone" placeholder="Телефон (необязательно)">
-            <button id="btn-add-client">Добавить</button>
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-save-client" style="flex: 2;">Добавить</button>
+                <button id="btn-cancel-client" class="btn-cancel" style="flex: 1;">Отмена</button>
+            </div>
         </div>
         <h2>Список клиентов</h2>
         <div id="clients-list"></div>
@@ -125,10 +93,14 @@
     <!-- ВКЛАДКА: РАСТЕНИЯ -->
     <div id="view-plants" class="view">
         <h1>🌿 Растения</h1>
-        <div class="card">
-            <h3>Добавить растение</h3>
+        <div id="plant-form-container" class="card form-container">
+            <h3 id="plant-form-title">Добавить растение</h3>
             <input type="text" id="plant-name" placeholder="Название (напр. Монстера)">
-            <button id="btn-add-plant">Добавить</button>
+            <input type="number" id="plant-price" placeholder="Стоимость (₽)" min="0" step="0.01">
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-save-plant" style="flex: 2;">Добавить</button>
+                <button id="btn-cancel-plant" class="btn-cancel" style="flex: 1;">Отмена</button>
+            </div>
         </div>
         <h2>Список растений</h2>
         <div id="plants-list"></div>
@@ -139,15 +111,12 @@
         <h1>📦 Заказы</h1>
         <div class="card">
             <h3>Новый заказ</h3>
-            
-            <div class="client-selector">
-                <label>👤 Клиент:</label>
-                <select id="order-client"></select>
+            <div class="client-selector" style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px; color: var(--primary);">👤 Клиент:</label>
+                <select id="order-client" style="margin-bottom: 0;"></select>
             </div>
-            
             <label style="font-weight: bold; display: block; margin-bottom: 10px;">🌱 Растения в заказе:</label>
             <div id="order-items-container"></div>
-            
             <button id="btn-add-item" class="btn-add-item">➕ Добавить растение</button>
             <button id="btn-add-order">✅ Создать заказы</button>
         </div>
@@ -199,49 +168,39 @@
         let plants  = [];
         let orders  = [];
 
+        // Состояние редактирования
+        let editingClientId = null;
+        let editingPlantId = null;
+        let editingOrderId = null;
+
         function setSyncStatus(status, message) {
             const el = document.getElementById('sync-status');
             el.className = 'sync-status sync-' + status;
             el.textContent = message;
         }
 
+        // --- FIREBASE ПОДПИСКИ ---
         db.ref('clients').on('value', (snapshot) => {
             clients = [];
             const data = snapshot.val();
-            if (data) {
-                Object.keys(data).forEach(key => {
-                    clients.push({ id: parseInt(key), ...data[key] });
-                });
-            }
+            if (data) Object.keys(data).forEach(key => clients.push({ id: parseInt(key), ...data[key] }));
             setSyncStatus('ok', '✅ Синхронизировано');
             renderClients();
-            if(document.getElementById('view-orders').classList.contains('active')) {
-                updateClientSelect();
-            }
+            if(document.getElementById('view-orders').classList.contains('active')) updateClientSelect();
         });
 
         db.ref('plants').on('value', (snapshot) => {
             plants = [];
             const data = snapshot.val();
-            if (data) {
-                Object.keys(data).forEach(key => {
-                    plants.push({ id: parseInt(key), ...data[key] });
-                });
-            }
+            if (data) Object.keys(data).forEach(key => plants.push({ id: parseInt(key), ...data[key] }));
             renderPlants();
-            if(document.getElementById('view-orders').classList.contains('active')) {
-                updateOrderItems();
-            }
+            if(document.getElementById('view-orders').classList.contains('active')) updateOrderItems();
         });
 
         db.ref('orders').on('value', (snapshot) => {
             orders = [];
             const data = snapshot.val();
-            if (data) {
-                Object.keys(data).forEach(key => {
-                    orders.push({ id: parseInt(key), ...data[key] });
-                });
-            }
+            if (data) Object.keys(data).forEach(key => orders.push({ id: parseInt(key), ...data[key] }));
             renderOrders();
         });
 
@@ -251,180 +210,218 @@
             document.getElementById('view-' + tab).classList.add('active');
             document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
             
-            if(tab === 'clients') renderClients();
-            if(tab === 'plants')  renderPlants();
+            if(tab === 'clients') { cancelEditClient(); renderClients(); }
+            if(tab === 'plants')  { cancelEditPlant(); renderPlants(); }
             if(tab === 'orders') {
+                editingOrderId = null; // Сброс редактирования заказа при уходе с вкладки
                 updateClientSelect();
                 updateOrderItems();
                 renderOrders();
             }
         }
 
-        function addClient() {
-            const name  = document.getElementById('client-name').value.trim();
+        // ================= КЛИЕНТЫ =================
+        function saveClient() {
+            const name = document.getElementById('client-name').value.trim();
             const phone = document.getElementById('client-phone').value.trim();
             if(!name) { alert('Введите имя клиента'); return; }
-            if(clients.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-                alert('Такой клиент уже есть');
-                return;
+            
+            if(!editingClientId && clients.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                alert('Такой клиент уже есть'); return;
             }
-            const id = Date.now();
+
+            const id = editingClientId || Date.now();
             db.ref('clients/' + id).set({
-                name: name, phone: phone, createdAt: new Date().toISOString()
+                name: name, phone: phone, createdAt: editingClientId ? clients.find(c=>c.id===id).createdAt : new Date().toISOString()
             }).then(() => {
-                document.getElementById('client-name').value = '';
-                document.getElementById('client-phone').value = '';
+                cancelEditClient();
                 setSyncStatus('ok', '✅ Сохранено');
             }).catch(error => alert('Ошибка: ' + error.message));
         }
 
+        function editClient(id) {
+            const client = clients.find(c => c.id === id);
+            if(!client) return;
+            editingClientId = id;
+            document.getElementById('client-name').value = client.name;
+            document.getElementById('client-phone').value = client.phone || '';
+            document.getElementById('client-form-title').textContent = '✏️ Редактирование клиента';
+            document.getElementById('btn-save-client').textContent = '💾 Сохранить';
+            document.getElementById('btn-cancel-client').style.display = 'block';
+            document.getElementById('client-form-container').classList.add('editing');
+            document.getElementById('client-name').focus();
+        }
+
+        function cancelEditClient() {
+            editingClientId = null;
+            document.getElementById('client-name').value = '';
+            document.getElementById('client-phone').value = '';
+            document.getElementById('client-form-title').textContent = 'Добавить клиента';
+            document.getElementById('btn-save-client').textContent = 'Добавить';
+            document.getElementById('btn-cancel-client').style.display = 'none';
+            document.getElementById('client-form-container').classList.remove('editing');
+        }
+
         function deleteClient(id) {
             const hasOrders = orders.some(o => o.clientId === id);
-            const msg = hasOrders 
-                ? 'У клиента есть заказы. Удалить? Заказы останутся с пометкой "Удалённый клиент".' 
-                : 'Удалить клиента?';
+            const msg = hasOrders ? 'У клиента есть заказы. Удалить? Заказы останутся с пометкой "Удалённый клиент".' : 'Удалить клиента?';
             if(confirm(msg)) {
-                db.ref('clients/' + id).remove()
-                .then(() => setSyncStatus('ok', '✅ Удалено'))
-                .catch(error => alert('Ошибка: ' + error.message));
+                db.ref('clients/' + id).remove().then(() => setSyncStatus('ok', '✅ Удалено')).catch(error => alert('Ошибка: ' + error.message));
             }
         }
 
         function renderClients() {
             const list = document.getElementById('clients-list');
-            if(clients.length === 0) { 
-                list.innerHTML = '<div class="empty">Пока нет клиентов</div>'; 
-                return; 
-            }
+            if(clients.length === 0) { list.innerHTML = '<div class="empty">Пока нет клиентов</div>'; return; }
             const sorted = [...clients].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
             list.innerHTML = sorted.map(c => `
                 <div class="card">
                     <div class="client-row">
-                        <div>
+                        <div style="flex:1">
                             <strong>${c.name}</strong>
                             ${c.phone ? `<div class="client-phone">📞 ${c.phone}</div>` : ''}
                         </div>
-                        <button class="btn-danger" data-delete-client="${c.id}">Удалить</button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-edit" data-edit-client="${c.id}">✏️</button>
+                            <button class="btn-danger" data-delete-client="${c.id}">🗑️</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
         }
 
-        function addPlant() {
+        // ================= РАСТЕНИЯ =================
+        function savePlant() {
             const name = document.getElementById('plant-name').value.trim();
+            const price = parseFloat(document.getElementById('plant-price').value) || 0;
             if(!name) { alert('Введите название'); return; }
-            const id = Date.now();
+            if(price < 0) { alert('Стоимость не может быть отрицательной'); return; }
+            
+            const id = editingPlantId || Date.now();
             db.ref('plants/' + id).set({
-                name: name, createdAt: new Date().toISOString()
+                name: name, price: price, createdAt: editingPlantId ? plants.find(p=>p.id===id).createdAt : new Date().toISOString()
             }).then(() => {
-                document.getElementById('plant-name').value = '';
+                cancelEditPlant();
                 setSyncStatus('ok', '✅ Сохранено');
             }).catch(error => alert('Ошибка: ' + error.message));
+        }
+
+        function editPlant(id) {
+            const plant = plants.find(p => p.id === id);
+            if(!plant) return;
+            editingPlantId = id;
+            document.getElementById('plant-name').value = plant.name;
+            document.getElementById('plant-price').value = plant.price || 0;
+            document.getElementById('plant-form-title').textContent = '✏️ Редактирование растения';
+            document.getElementById('btn-save-plant').textContent = '💾 Сохранить';
+            document.getElementById('btn-cancel-plant').style.display = 'block';
+            document.getElementById('plant-form-container').classList.add('editing');
+            document.getElementById('plant-name').focus();
+        }
+
+        function cancelEditPlant() {
+            editingPlantId = null;
+            document.getElementById('plant-name').value = '';
+            document.getElementById('plant-price').value = '';
+            document.getElementById('plant-form-title').textContent = 'Добавить растение';
+            document.getElementById('btn-save-plant').textContent = 'Добавить';
+            document.getElementById('btn-cancel-plant').style.display = 'none';
+            document.getElementById('plant-form-container').classList.remove('editing');
         }
 
         function deletePlant(id) {
             const hasOrders = orders.some(o => o.plantId === id);
             const msg = hasOrders ? 'У растения есть заказы. Удалить?' : 'Удалить растение?';
             if(confirm(msg)) {
-                db.ref('plants/' + id).remove()
-                .then(() => setSyncStatus('ok', '✅ Удалено'))
-                .catch(error => alert('Ошибка: ' + error.message));
+                db.ref('plants/' + id).remove().then(() => setSyncStatus('ok', '✅ Удалено')).catch(error => alert('Ошибка: ' + error.message));
             }
         }
 
         function renderPlants() {
             const list = document.getElementById('plants-list');
-            if(plants.length === 0) { 
-                list.innerHTML = '<div class="empty">Пока нет растений</div>'; 
-                return; 
-            }
-            list.innerHTML = plants.map(p => `
+            if(plants.length === 0) { list.innerHTML = '<div class="empty">Пока нет растений</div>'; return; }
+            const sorted = [...plants].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
+            list.innerHTML = sorted.map(p => `
                 <div class="card">
                     <div class="client-row">
-                        <strong>${p.name}</strong>
-                        <button class="btn-danger" data-delete-plant="${p.id}">Удалить</button>
+                        <div style="flex:1">
+                            <strong>${p.name}</strong>
+                            ${p.price ? `<div class="plant-price">💰 ${p.price.toLocaleString('ru-RU')} ₽</div>` : ''}
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-edit" data-edit-plant="${p.id}">✏️</button>
+                            <button class="btn-danger" data-delete-plant="${p.id}">🗑️</button>
+            </div>
                     </div>
                 </div>
             `).join('');
         }
 
+        // ================= ЗАКАЗЫ =================
         function updateClientSelect() {
             const select = document.getElementById('order-client');
-            if(clients.length === 0) {
-                select.innerHTML = '<option value="">⚠️ Сначала добавьте клиента</option>';
-                return;
-            }
+            if(clients.length === 0) { select.innerHTML = '<option value="">⚠️ Сначала добавьте клиента</option>'; return; }
             const sorted = [...clients].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
-            select.innerHTML = '<option value="">— Выберите клиента —</option>' + 
-                sorted.map(c => `<option value="${c.id}">${c.name}${c.phone ? ' ('+c.phone+')' : ''}</option>`).join('');
+            select.innerHTML = '<option value="">— Выберите клиента —</option>' + sorted.map(c => `<option value="${c.id}">${c.name}${c.phone ? ' ('+c.phone+')' : ''}</option>`).join('');
         }
 
         function createOrderItemHTML(index = 0) {
             const sortedPlants = [...plants].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
-            const plantOptions = plants.length === 0 
-                ? '<option value="">Нет растений</option>'
-                : '<option value="">— Выберите растение —</option>' + 
-                  sortedPlants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            const plantOptions = plants.length === 0 ? '<option value="">Нет растений</option>' : 
+                '<option value="">— Выберите растение —</option>' + sortedPlants.map(p => `<option value="${p.id}" data-price="${p.price || 0}">${p.name}${p.price ? ' ('+p.price.toLocaleString('ru-RU')+' ₽)' : ''}</option>`).join('');
             
-            return `
-                <div class="order-item" data-item-index="${index}">
-                    <select class="item-plant">${plantOptions}</select>
-                    <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="1">
-                    <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>
-                </div>
-            `;
+            return `<div class="order-item" data-item-index="${index}">
+                <select class="item-plant" onchange="updateItemPrice(${index})">${plantOptions}</select>
+                <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="1" oninput="updateItemTotal(${index})">
+                <input type="number" class="item-price" placeholder="Цена" min="0" step="0.01" value="0" oninput="updateItemTotal(${index})">
+                <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>
+            </div>`;
         }
 
         function updateOrderItems() {
             const container = document.getElementById('order-items-container');
-            const sortedPlants = [...plants].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
-            
-            if (container.children.length === 0) {
-                container.innerHTML = createOrderItemHTML(0);
-            } else {
-                const items = container.querySelectorAll('.order-item');
-                items.forEach((item, index) => {
-                    const currentPlantId = item.querySelector('.item-plant').value;
-                    const currentQty = item.querySelector('.item-qty').value;
-                    
-                    const plantOptions = plants.length === 0 
-                        ? '<option value="">Нет растений</option>'
-                        : '<option value="">— Выберите растение —</option>' + 
-                          sortedPlants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-                    
-                    item.innerHTML = `
-                        <select class="item-plant">${plantOptions}</select>
-                        <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="${currentQty || 1}">
-                        <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>
-                    `;
-                    
-                    if (currentPlantId) {
-                        item.querySelector('.item-plant').value = currentPlantId;
-                    }
-                });
-            }
+            if (container.children.length === 0) { container.innerHTML = createOrderItemHTML(0); return; }
+            const items = container.querySelectorAll('.order-item');
+            items.forEach((item, index) => {
+                const currentPlantId = item.querySelector('.item-plant').value;
+                const currentQty = item.querySelector('.item-qty').value;
+                const currentPrice = item.querySelector('.item-price').value;
+                const sortedPlants = [...plants].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
+                const plantOptions = plants.length === 0 ? '<option value="">Нет растений</option>' : 
+                    '<option value="">— Выберите растение —</option>' + sortedPlants.map(p => `<option value="${p.id}" data-price="${p.price || 0}">${p.name}${p.price ? ' ('+p.price.toLocaleString('ru-RU')+' ₽)' : ''}</option>`).join('');
+                
+                item.innerHTML = `<select class="item-plant" onchange="updateItemPrice(${index})">${plantOptions}</select>
+                    <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="${currentQty || 1}" oninput="updateItemTotal(${index})">
+                    <input type="number" class="item-price" placeholder="Цена" min="0" step="0.01" value="${currentPrice || 0}" oninput="updateItemTotal(${index})">
+                    <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>`;
+                if (currentPlantId) item.querySelector('.item-plant').value = currentPlantId;
+            });
         }
+
+        function updateItemPrice(index) {
+            const item = document.querySelectorAll('.order-item')[index];
+            if (!item) return;
+            const select = item.querySelector('.item-plant');
+            const price = parseFloat(select.options[select.selectedIndex].getAttribute('data-price')) || 0;
+            item.querySelector('.item-price').value = price;
+        }
+        function updateItemTotal(index) {} // Заглушка для будущей логики
 
         function addOrderItem() {
             const container = document.getElementById('order-items-container');
-            const newIndex = container.children.length;
-            container.insertAdjacentHTML('beforeend', createOrderItemHTML(newIndex));
+            container.insertAdjacentHTML('beforeend', createOrderItemHTML(container.children.length));
             updateRemoveButtons();
         }
 
         function removeOrderItem(index) {
             const container = document.getElementById('order-items-container');
-            if (container.children.length <= 1) {
-                alert('Должна остаться хотя бы одна позиция');
-                return;
-            }
+            if (container.children.length <= 1) { alert('Должна остаться хотя бы одна позиция'); return; }
             container.children[index].remove();
             updateRemoveButtons();
         }
 
         function updateRemoveButtons() {
-            const items = document.querySelectorAll('.order-item');
-            items.forEach((item, index) => {
+            document.querySelectorAll('.order-item').forEach((item, index) => {
                 item.setAttribute('data-item-index', index);
                 const btn = item.querySelector('.btn-remove');
                 if (btn) btn.setAttribute('data-remove-item', index);
@@ -433,73 +430,113 @@
 
         function addOrder() {
             const clientId = parseInt(document.getElementById('order-client').value);
-            if(!clientId) { 
-                alert('Выберите клиента'); 
-                return; 
-            }
-
+            if(!clientId) { alert('Выберите клиента'); return; }
             const items = document.querySelectorAll('.order-item');
             const orderItems = [];
-            
             for (const item of items) {
                 const plantId = parseInt(item.querySelector('.item-plant').value);
                 const qty = parseInt(item.querySelector('.item-qty').value);
-                
-                if(!plantId || !qty || qty < 1) {
-                    alert('Заполните все позиции: выберите растение и укажите количество');
-                    return;
-                }
-                orderItems.push({ plantId, qty });
+                const price = parseFloat(item.querySelector('.item-price').value) || 0;
+                if(!plantId || !qty || qty < 1) { alert('Заполните все позиции'); return; }
+                if(price < 0) { alert('Цена не может быть отрицательной'); return; }
+                orderItems.push({ plantId, qty, price });
             }
-
-            if(orderItems.length === 0) {
-                alert('Добавьте хотя бы одно растение');
-                return;
-            }
+            if(orderItems.length === 0) { alert('Добавьте хотя бы одно растение'); return; }
 
             const baseDate = new Date().toISOString();
             const batchId = Date.now();
-            
             const promises = orderItems.map((item, index) => {
-                const orderId = batchId + index;
-                return db.ref('orders/' + orderId).set({
-                    clientId: clientId,
-                    plantId: item.plantId,
-                    qty: item.qty,
-                    status: 'pending',
-                    date: baseDate,
-                    batchId: batchId
+                return db.ref('orders/' + (batchId + index)).set({
+                    clientId, plantId: item.plantId, qty: item.qty, price: item.price,
+                    status: 'pending', date: baseDate, batchId
                 });
             });
-
-            Promise.all(promises)
-                .then(() => {
-                    setSyncStatus('ok', `✅ Создано заказов: ${orderItems.length}`);
-                    document.getElementById('order-client').value = '';
-                    document.getElementById('order-items-container').innerHTML = createOrderItemHTML(0);
-                    updateRemoveButtons();
-                })
-                .catch(error => alert('Ошибка: ' + error.message));
+            Promise.all(promises).then(() => {
+                setSyncStatus('ok', `✅ Создано заказов: ${orderItems.length}`);
+                document.getElementById('order-client').value = '';
+                document.getElementById('order-items-container').innerHTML = createOrderItemHTML(0);
+                updateRemoveButtons();
+            }).catch(error => alert('Ошибка: ' + error.message));
         }
 
-        function toggleStatus(id) {
+        // --- РЕДАКТИРОВАНИЕ ЗАКАЗА ---
+        function startEditOrder(id) {
+            editingOrderId = id;
             const order = orders.find(o => o.id === id);
-            const newStatus = order.status === 'pending' ? 'done' : 'pending';
-            const updateData = { status: newStatus };
-            if(newStatus === 'done') updateData.completedDate = new Date().toISOString();
-            else updateData.completedDate = null;
-            
-            db.ref('orders/' + id).update(updateData)
-            .then(() => setSyncStatus('ok', '✅ Обновлено'))
-            .catch(error => alert('Ошибка: ' + error.message));
+            if(!order) return;
+
+            const card = document.querySelector(`[data-order-card="${id}"]`);
+            if(!card) return;
+
+            const clientOptions = clients.map(c => `<option value="${c.id}" ${c.id === order.clientId ? 'selected' : ''}>${c.name}</option>`).join('');
+            const plantOptions = plants.map(p => `<option value="${p.id}" ${p.id === order.plantId ? 'selected' : ''}>${p.name}</option>`).join('');
+
+            card.innerHTML = `
+                <div class="edit-order-form">
+                    <div style="font-weight:bold; margin-bottom:10px; color:var(--primary);">✏️ Редактирование заказа</div>
+                    <label>Клиент:</label>
+                    <select id="edit-ord-client">${clientOptions}</select>
+                    <label>Растение:</label>
+                    <select id="edit-ord-plant">${plantOptions}</select>
+                    <div style="display:flex; gap:8px;">
+                        <div style="flex:1"><label>Кол-во:</label><input type="number" id="edit-ord-qty" value="${order.qty}" min="1"></div>
+                        <div style="flex:1"><label>Цена (₽):</label><input type="number" id="edit-ord-price" value="${order.price || 0}" min="0" step="0.01"></div>
+                    </div>
+                    <label>Статус:</label>
+                    <select id="edit-ord-status">
+                        <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>В работе</option>
+                        <option value="done" ${order.status === 'done' ? 'selected' : ''}>Выполнен</option>
+                    </select>
+                    <div class="edit-order-actions">
+                        <button class="btn-small" data-save-order="${id}">💾 Сохранить</button>
+                        <button class="btn-secondary" data-cancel-order="${id}">Отмена</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function saveOrderEdit(id) {
+            const clientId = parseInt(document.getElementById('edit-ord-client').value);
+            const plantId = parseInt(document.getElementById('edit-ord-plant').value);
+            const qty = parseInt(document.getElementById('edit-ord-qty').value);
+            const price = parseFloat(document.getElementById('edit-ord-price').value) || 0;
+            const status = document.getElementById('edit-ord-status').value;
+
+            if(!clientId || !plantId || !qty || qty < 1) { alert('Заполните все поля корректно'); return; }
+
+            // ВАЖНО: Мы используем .update(), а не .set(), и НЕ передаем поле 'date' или 'batchId'.
+            // Таким образом, дата создания останется оригинальной.
+            const updateData = { clientId, plantId, qty, price, status };
+            if(status === 'done' && !orders.find(o=>o.id===id).completedDate) {
+                updateData.completedDate = new Date().toISOString();
+            } else if (status === 'pending') {
+                updateData.completedDate = null;
+            }
+
+            db.ref('orders/' + id).update(updateData).then(() => {
+                editingOrderId = null;
+                setSyncStatus('ok', '✅ Заказ обновлен');
+                renderOrders(); // Перерисует карточку в обычном виде
+            }).catch(error => alert('Ошибка: ' + error.message));
+        }
+
+        function cancelEditOrder() {
+            editingOrderId = null;
+            renderOrders(); // Просто перерисовываем, возвращая обычный вид
         }
 
         function deleteOrder(id) {
             if(confirm('Удалить заказ?')) {
-                db.ref('orders/' + id).remove()
-                .then(() => setSyncStatus('ok', '✅ Удалено'))
-                .catch(error => alert('Ошибка: ' + error.message));
+                db.ref('orders/' + id).remove().then(() => setSyncStatus('ok', '✅ Удалено')).catch(error => alert('Ошибка: ' + error.message));
             }
+        }
+
+        function calculateTotal(orderList) {
+            return orderList.reduce((sum, o) => sum + (o.qty * (o.price || 0)), 0);
+        }
+
+        function formatMoney(amount) {
+            return amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽';
         }
 
         function renderOrders() {
@@ -508,7 +545,6 @@
             const groupBy = document.getElementById('group-by').value;
             
             let filtered = orders.filter(o => filter === 'all' || o.status === filter);
-
             filtered.sort((a, b) => {
                 if (sortBy === 'date-desc') return new Date(b.date) - new Date(a.date);
                 if (sortBy === 'date-asc')  return new Date(a.date) - new Date(b.date);
@@ -521,155 +557,136 @@
             });
 
             const list = document.getElementById('orders-list');
-            if(filtered.length === 0) { 
-                list.innerHTML = '<div class="empty">Нет заказов</div>'; 
-                return; 
-            }
+            if(filtered.length === 0) { list.innerHTML = '<div class="empty">Нет заказов</div>'; return; }
 
             let html = '';
 
-            // Группировка по растениям
             if (groupBy === 'plant') {
                 const groupedByPlant = {};
-                filtered.forEach(o => {
-                    if (!groupedByPlant[o.plantId]) groupedByPlant[o.plantId] = [];
-                    groupedByPlant[o.plantId].push(o);
-                });
-
+                filtered.forEach(o => { if (!groupedByPlant[o.plantId]) groupedByPlant[o.plantId] = []; groupedByPlant[o.plantId].push(o); });
                 Object.keys(groupedByPlant).forEach(plantId => {
                     const plant = plants.find(p => p.id === parseInt(plantId));
                     const plantName = plant ? plant.name : '🚫 Удалённое растение';
                     const plantOrders = groupedByPlant[plantId];
-
-                    html += `<div class="group-header">🌱 ${plantName} (${plantOrders.length} заказ${plantOrders.length > 1 ? (plantOrders.length < 5 ? 'а' : 'ов') : ''})</div>`;
-
-                    // Группируем по клиентам внутри растения
+                    html += `<div class="group-header"><span>🌱 ${plantName} (${plantOrders.length} шт.)</span><span class="sum">💰 ${formatMoney(calculateTotal(plantOrders))}</span></div>`;
                     const groupedByClient = {};
-                    plantOrders.forEach(o => {
-                        if (!groupedByClient[o.clientId]) groupedByClient[o.clientId] = [];
-                        groupedByClient[o.clientId].push(o);
-                    });
-
+                    plantOrders.forEach(o => { if (!groupedByClient[o.clientId]) groupedByClient[o.clientId] = []; groupedByClient[o.clientId].push(o); });
                     Object.keys(groupedByClient).forEach(clientId => {
                         const client = clients.find(c => c.id === parseInt(clientId));
                         const clientName = client ? client.name : '🚫 Удалённый клиент';
                         const clientOrders = groupedByClient[clientId];
-
-                        html += `<div class="group-subheader">👤 ${clientName}</div>`;
-
-                        clientOrders.forEach(o => {
-                            html += renderOrderCard(o, true);
-                        });
+                        html += `<div class="group-subheader"><span>👤 ${clientName}</span><span class="sum">${formatMoney(calculateTotal(clientOrders))}</span></div>`;
+                        clientOrders.forEach(o => { html += renderOrderCard(o, true); });
                     });
                 });
-            }
-            // Группировка по клиентам
-            else if (groupBy === 'client') {
+            } else if (groupBy === 'client') {
                 const groupedByClient = {};
-                filtered.forEach(o => {
-                    if (!groupedByClient[o.clientId]) groupedByClient[o.clientId] = [];
-                    groupedByClient[o.clientId].push(o);
-                });
-
+                filtered.forEach(o => { if (!groupedByClient[o.clientId]) groupedByClient[o.clientId] = []; groupedByClient[o.clientId].push(o); });
                 Object.keys(groupedByClient).forEach(clientId => {
                     const client = clients.find(c => c.id === parseInt(clientId));
                     const clientName = client ? client.name : '🚫 Удалённый клиент';
                     const clientOrders = groupedByClient[clientId];
-
-                    html += `<div class="group-header">👤 ${clientName} (${clientOrders.length} заказ${clientOrders.length > 1 ? (clientOrders.length < 5 ? 'а' : 'ов') : ''})</div>`;
-
-                    // Группируем по растениям внутри клиента
+                    html += `<div class="group-header"><span>👤 ${clientName} (${clientOrders.length} шт.)</span><span class="sum">💰 ${formatMoney(calculateTotal(clientOrders))}</span></div>`;
                     const groupedByPlant = {};
-                    clientOrders.forEach(o => {
-                        if (!groupedByPlant[o.plantId]) groupedByPlant[o.plantId] = [];
-                        groupedByPlant[o.plantId].push(o);
-                    });
-
+                    clientOrders.forEach(o => { if (!groupedByPlant[o.plantId]) groupedByPlant[o.plantId] = []; groupedByPlant[o.plantId].push(o); });
                     Object.keys(groupedByPlant).forEach(plantId => {
                         const plant = plants.find(p => p.id === parseInt(plantId));
                         const plantName = plant ? plant.name : '🚫 Удалённое растение';
                         const plantOrders = groupedByPlant[plantId];
-
-                        html += `<div class="group-subheader">🌱 ${plantName}</div>`;
-
-                        plantOrders.forEach(o => {
-                            html += renderOrderCard(o, true);
-                        });
+                        html += `<div class="group-subheader"><span>🌱 ${plantName}</span><span class="sum">${formatMoney(calculateTotal(plantOrders))}</span></div>`;
+                        plantOrders.forEach(o => { html += renderOrderCard(o, true); });
                     });
                 });
+            } else {
+                html += `<div class="total-sum">💰 Итого: ${formatMoney(calculateTotal(filtered))}</div>`;
+                filtered.forEach(o => { html += renderOrderCard(o, false); });
             }
-            // Без группировки
-            else {
-                filtered.forEach(o => {
-                    html += renderOrderCard(o, false);
-                });
-            }
-
             list.innerHTML = html;
         }
 
         function renderOrderCard(order, isGrouped) {
+            // Если этот заказ сейчас редактируется, возвращаем форму (хотя renderOrders и так это обрабатывает, это страховка)
+            if (editingOrderId === order.id) {
+                // Этот блок не должен срабатывать, если startEditOrder уже подменил innerHTML, 
+                // но на всякий случай оставим стандартный рендер, а редактирование управляется через DOM-манипуляции в startEditOrder.
+                // Чтобы избежать конфликтов, мы просто не будем рендерить его здесь, если он редактируется, 
+                // но так как мы делаем innerHTML замену в startEditOrder, нам нужно найти этот элемент.
+                // Упрощение: просто вернем обычную карточку, а startEditOrder найдет её по data-атрибуту и заменит.
+            }
+
             const client = clients.find(c => c.id === order.clientId);
             const plant  = plants.find(p => p.id === order.plantId);
             const clientName = client ? client.name : '🚫 Удалённый клиент';
-            const plantName  = plant  ? plant.name  : '🚫 Удалённое растение';
+            const plantName  = plant  ? plant.name  : '🚫 Удалёاенное растение';
             const dateStr = new Date(order.date).toLocaleDateString('ru-RU');
             const timeStr = new Date(order.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
             const statusClass = order.status === 'done' ? 'status-done' : 'status-pending';
             const statusText = order.status === 'done' ? 'Выполнен' : 'В работе';
+            const orderTotal = order.qty * (order.price || 0);
 
             const className = isGrouped ? 'card group-item' : 'card';
 
             return `
-                <div class="${className}">
+                <div class="${className}" data-order-card="${order.id}">
                     <div class="order-header">
                         <strong>${isGrouped ? `Кол-во: ${order.qty}` : clientName}</strong>
                         <span class="status ${statusClass}">${statusText}</span>
                     </div>
                     <div style="margin-bottom: 10px; color: var(--grey); font-size: 14px;">
-                        ${!isGrouped ? `🌱 ${plantName} | Кол-во: ${order.qty}<br>` : ''}
+                        ${!isGrouped ? `🌱 ${plantName}<br>` : ''}
+                        💰 Цена: ${formatMoney(order.price || 0)} | Сумма: <span class="order-price">${formatMoney(orderTotal)}</span><br>
                         📅 ${dateStr} ${timeStr}
                     </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn-small" data-toggle="${order.id}" style="flex:1;">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn-small" data-toggle="${order.id}" style="flex:1; min-width: 100px;">
                             ${order.status === 'done' ? '↩️ В работу' : '✅ Выполнить'}
                         </button>
-                        <button class="btn-danger" data-delete-order="${order.id}">🗑️</button>
+                        <button class="btn-edit" data-edit-order="${order.id}" style="flex:1; min-widthА: 80px;">✏️ Изменить</button>
+                        <button class="btn-danger" data-delete-order="${order.id}" style="flex:0; min-width: 40px;">🗑️</button>
                     </div>
                 </div>
             `;
         }
 
+        // --- ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ СОБЫТИЙ ---
         document.addEventListener('click', function(e) {
-            if(e.target.classList.contains('tab')) {
-                switchTab(e.target.getAttribute('data-tab'));
-                return;
-            }
-            if(e.target.id === 'btn-add-client') { addClient(); return; }
-            if(e.target.id === 'btn-add-plant')  { addPlant();  return; }
-            if(e.target.id === 'btn-add-order')  { addOrder();  return; }
-            if(e.target.id === 'btn-add-item')   { addOrderItem(); return; }
+            const target = e.target;
             
-            if(e.target.hasAttribute('data-remove-item')) {
-                removeOrderItem(parseInt(e.target.getAttribute('data-remove-item')));
-                return;
+            // Вкладки
+            if(target.classList.contains('tab')) { switchTab(target.getAttribute('data-tab')); return; }
+            
+            // Клиенты
+            if(target.id === 'btn-save-client') { saveClient(); return; }
+            if(target.id === 'btn-cancel-client') { cancelEditClient(); return; }
+            if(target.hasAttribute('data-edit-client')) { editClient(parseInt(target.getAttribute('data-edit-client'))); return; }
+            if(target.hasAttribute('data-delete-client')) { deleteClient(parseInt(target.getAttribute('data-delete-client'))); return; }
+            
+            // Растения
+            if(target.id === 'btn-save-plant') { savePlant(); return; }
+            if(target.id === 'btn-cancel-plant') { cancelEditPlant(); return; }
+            if(target.hasAttribute('data-edit-plant')) { editPlant(parseInt(target.getAttribute('data-edit-plant'))); return; }
+            if(target.hasAttribute('data-delete-plant')) { deletePlant(parseInt(target.getAttribute('data-delete-plant'))); return; }
+            
+            // Заказы (создание)
+            if(target.id === 'btn-add-order') { addOrder(); return; }
+            if(target.id === 'btn-add-item') { addOrderItem(); return; }
+            if(target.hasAttribute('data-remove-item')) { removeOrderItem(parseInt(target.getAttribute('data-remove-item'))); return; }
+            
+            // Заказы (действия с карточкой)
+            if(target.hasAttribute('data-edit-order')) { 
+                startEditOrder(parseInt(target.getAttribute('data-edit-order'))); 
+                return; 
             }
-            if(e.target.hasAttribute('data-delete-client')) {
-                deleteClient(parseInt(e.target.getAttribute('data-delete-client')));
-                return;
+            if(target.hasAttribute('data-save-order')) { 
+                saveOrderEdit(parseInt(target.getAttribute('data-save-order'))); 
+                return; 
             }
-            if(e.target.hasAttribute('data-delete-plant')) {
-                deletePlant(parseInt(e.target.getAttribute('data-delete-plant')));
-                return;
+            if(target.hasAttribute('data-cancel-order')) { 
+                cancelEditOrder(); 
+                return; 
             }
-            if(e.target.hasAttribute('data-toggle')) {
-                toggleStatus(parseInt(e.target.getAttribute('data-toggle')));
-                return;
-            }
-            if(e.target.hasAttribute('data-delete-order')) {
-                deleteOrder(parseInt(e.target.getAttribute('data-delete-order')));
-                return;
-            }
+            if(target.hasAttribute('data-toggle')) { toggleStatus(parseInt(target.getAttribute('data-toggle'))); return; }
+            if(target.hasAttribute('data-delete-order')) { deleteOrder(parseInt(target.getAttribute('data-delete-order'))); return; }
         });
 
         document.getElementById('sort-by').addEventListener('change', renderOrders);
