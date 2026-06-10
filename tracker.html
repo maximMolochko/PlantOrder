@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Трекер Времени</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <style>
+        :root { --primary: #1976d2; --bg: #f5f5f5; --card: #fff; --text: #333; --danger: #d32f2f; --grey: #757575; --success: #388e3c; --warning: #f57c00; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; padding-bottom: 90px; }
+        h1, h2 { color: var(--primary); margin-top: 0; font-size: 22px; }
+        .tabs { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; }
+        .tab { flex: 1; padding: 12px 5px; text-align: center; font-weight: bold; color: var(--grey); cursor: pointer; font-size: 14px; }
+        .tab.active { color: var(--primary); border-top: 3px solid var(--primary); }
+        .view { display: none; }
+        .view.active { display: block; }
+        .card { background: var(--card); padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        input, select, button { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); }
+        .btn-small { padding: 8px; font-size: 14px; width: auto; }
+        .empty { text-align: center; color: var(--grey); padding: 20px; }
+        .row { display: flex; gap: 10px; }
+        .row > * { flex: 1; margin-bottom: 10px; }
+        
+        /* Активный таймер */
+        .active-timer-card {
+            background: #e3f2fd;
+            border: 2px solid var(--primary);
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(25, 118, 210, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0); }
+        }
+        .timer-display { font-size: 48px; font-weight: bold; color: var(--primary); margin: 15px 0; font-variant-numeric: tabular-nums; }
+        .timer-info { font-size: 16px; color: var(--text); margin-bottom: 15px; }
+        .timer-info strong { display: block; font-size: 18px; margin-bottom: 5px; }
+
+        /* Карточка недавней задачи */
+        .recent-task-card {
+            padding: 12px; margin-bottom: 10px; border-left: 4px solid var(--success);
+        }
+
+        /* Таблица статистики */
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .stats-table th, .stats-table td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        .stats-table th { background: #f9f9f9; font-weight: bold; color: var(--grey); }
+        .total-row { font-weight: bold; background: #e8f5e9; }
+        
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .filter-bar input { flex: 1; margin-bottom: 0; }
+        .filter-bar button { flex: 0 0 auto; width: auto; margin-bottom: 0; padding: 12px 20px; }
+    </style>
+</head>
+<body>
+
+    <!-- ВКЛАДКА: ТРЕКЕР -->
+    <div id="view-tracker" class="view active">
+        <h1>🕒 Трекер времени</h1>
+        
+        <!-- Активный таймер (скрыт, если нет активной задачи) -->
+        <div id="active-timer" class="card active-timer-card" style="display: none;">
+            <h3>⏱️ Идет работа</h3>
+            <div class="timer-info">
+                <strong id="timer-counterparty">Контрагент</strong>
+                <span id="timer-task">Задача</span>
+            </div>
+            <div class="timer-display" id="timer-display">00:00:00</div>
+            <button id="btn-stop" class="btn-danger" style="font-size: 18px; padding: 15px;">⏹ ОСТАНОВИТЬ И СОХРАНИТЬ</button>
+        </div>
+
+        <!-- Форма новой задачи -->
+        <div id="new-task-form" class="card">
+            <h3>▶️ Начать новую задачу</h3>
+            <select id="task-counterparty">
+                <option value="">— Выберите контрагента —</option>
+            </select>
+            <input type="text" id="task-description" placeholder="Описание задачи (напр. Консультация)">
+            <button id="btn-start" class="btn-success">▶️ Старт</button>
+        </div>
+
+        <button id="btn-show-manual" class="btn-warning" style="margin-top: 10px;">➕ Добавить время вручную</button>
+
+        <!-- Форма ручного ввода (скрыта) -->
+        <div id="manual-form" class="card" style="display: none; background: #fff3e0;">
+            <h3>✏️ Ручной ввод времени</h3>
+            <select id="manual-counterparty"></select>
+            <input type="text" id="manual-description" placeholder="Описание задачи">
+            <label style="font-size: 14px; color: var(--grey);">Дата и время начала:</label>
+            <input type="datetime-local" id="manual-start">
+            <label style="font-size: 14px; color: var(--grey);">Дата и время окончания:</label>
+            <input type="datetime-local" id="manual-end">
+            <div class="row">
+                <button id="btn-save-manual" class="btn-success">💾 Сохранить</button>
+                <button id="btn-cancel-manual" class="btn-small" style="background: var(--grey);">Отмена</button>
+            </div>
+        </div>
+
+        <!-- Список последних задач -->
+        <h2 style="margin-top: 30px;">📋 Последние 10 задач</h2>
+        <div id="recent-tasks-list"></div>
+    </div>
+
+    <!-- ВКЛАДКА: КОНТРАГЕНТЫ -->
+    <div id="view-counterparties" class="view">
+        <h1>🏢 Контрагенты</h1>
+        <div class="card">
+            <h3>Добавить контрагента</h3>
+            <input type="text" id="cp-name" placeholder="Название компании / Имя">
+            <button id="btn-add-cp">Добавить</button>
+        </div>
+        <h2>Список</h2>
+        <div id="cp-list"></div>
+    </div>
+
+    <!-- ВКЛАДКА: СТАТИСТИКА -->
+    <div id="view-stats" class="view">
+        <h1>📊 Статистика</h1>
+        <div class="card">
+            <div class="filter-bar">
+                <input type="date" id="stat-start-date">
+                <input type="date" id="stat-end-date">
+                <button id="btn-apply-filter" class="btn-small">OK</button>
+            </div>
+            <button id="btn-export-csv" class="btn-success" style="margin-bottom: 15px;">📥 Выгрузить в Excel (CSV)</button>
+            
+            <div id="stats-content">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Контрагент</th>
+                            <th>Часы (дробные)</th>
+                            <th>Часы (чч:мм)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stats-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <h2>Детализация за период</h2>
+        <div id="details-list"></div>
+    </div>
+
+    <!-- НИЖНЕЕ МЕНЮ -->
+    <div class="tabs">
+        <div class="tab active" data-tab="tracker">🕒 Трекер</div>
+        <div class="tab" data-tab="counterparties">🏢 Контрагенты</div>
+        <div class="tab" data-tab="stats">📊 Статистика</div>
+    </div>
+
+    <script>
+        // ==========================================
+        // КОНФИГУРАЦИЯ FIREBASE
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyC2UyhWjiI_y7vBSHSBRmwyKsjwj0b3iYA",
+            authDomain: "garden-orders.firebaseapp.com",
+            projectId: "garden-orders",
+            storageBucket: "garden-orders.firebasestorage.app",
+            messagingSenderId: "907542509265",
+            appId: "1:907542509265:web:224c71edf6f51b7ab9f7f0",
+            databaseURL: "https://garden-orders-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Состояние приложения
+        let counterparties = [];
+        let timeEntries = [];
+        let activeEntry = null;
+        let timerInterval = null;
+
+        // ==========================================
+        // ИНИЦИАЛИЗАЦИЯ И ПОДПИСКИ
+        // ==========================================
+        function init() {
+            setDefaultDates();
+            
+            // Загрузка контрагентов
+            db.ref('timetracker/counterparties').on('value', (snapshot) => {
+                counterparties = [];
+                const data = snapshot.val();
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        counterparties.push({ id: key, ...data[key] });
+                    });
+                }
+                counterparties.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+                renderCounterparties();
+                updateCounterpartySelects();
+            });
+
+            // Загрузка записей времени
+            db.ref('timetracker/time_entries').on('value', (snapshot) => {
+                timeEntries = [];
+                const data = snapshot.val();
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        timeEntries.push({ id: key, ...data[key] });
+                    });
+                }
+                // Сортировка по времени начала (новые сверху)
+                timeEntries.sort((a, b) => b.startTime - a.startTime);
+                
+                checkActiveTimer();
+                renderStats();
+            });
+        }
+
+        // ==========================================
+        // НАВИГАЦИЯ
+        // ==========================================
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('view-' + tab.dataset.tab).classList.add('active');
+                
+                if (tab.dataset.tab === 'stats') renderStats();
+            });
+        });
+
+        // ==========================================
+        // КОНТРАГЕНТЫ
+        // ==========================================
+        document.getElementById('btn-add-cp').addEventListener('click', () => {
+            const name = document.getElementById('cp-name').value.trim();
+            if (!name) return alert('Введите название');
+            
+            db.ref('timetracker/counterparties').push({
+                name: name,
+                createdAt: Date.now()
+            }).then(() => {
+                document.getElementById('cp-name').value = '';
+            });
+        });
+
+        function renderCounterparties() {
+            const list = document.getElementById('cp-list');
+            if (counterparties.length === 0) {
+                list.innerHTML = '<div class="empty">Пока нет контрагентов</div>';
+                return;
+            }
+            list.innerHTML = counterparties.map(cp => `
+                <div class="card" style="padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <strong>${cp.name}</strong>
+                    <button class="btn-small btn-danger" onclick="deleteCP('${cp.id}')">🗑️</button>
+                </div>
+            `).join('');
+        }
+
+        window.deleteCP = function(id) {
+            if (confirm('Удалить контрагента? Записи времени останутся, но с пометкой "Удален".')) {
+                db.ref('timetracker/counterparties/' + id).remove();
+            }
+        };
+
+        function updateCounterpartySelects() {
+            const options = '<option value="">— Выберите —</option>' + 
+                counterparties.map(cp => `<option value="${cp.id}">${cp.name}</option>`).join('');
+            document.getElementById('task-counterparty').innerHTML = options;
+            document.getElementById('manual-counterparty').innerHTML = options;
+        }
+
+        // ==========================================
+        // ТРЕКЕР (ТАЙМЕР)
+        // ==========================================
+        document.getElementById('btn-start').addEventListener('click', () => {
+            const cpId = document.getElementById('task-counterparty').value;
+            const task = document.getElementById('task-description').value.trim();
+            
+            if (!cpId) return alert('Выберите контрагента');
+            if (!task) return alert('Введите описание задачи');
+
+            const newEntry = {
+                counterpartyId: cpId,
+                task: task,
+                startTime: Date.now(),
+                endTime: null,
+                isManual: false
+            };
+
+            db.ref('timetracker/time_entries').push(newEntry).then(() => {
+                document.getElementById('task-description').value = '';
+            });
+        });
+
+        document.getElementById('btn-stop').addEventListener('click', () => {
+            if (!activeEntry) return;
+            db.ref('timetracker/time_entries/' + activeEntry.id).update({
+                endTime: Date.now()
+            }).then(() => {
+                // После успешного сохранения база данных обновится и сама вызовет checkActiveTimer
+            });
+        });
+
+        function checkActiveTimer() {
+            // Ищем запись, у которой НЕТ endTime (надежная проверка на null или undefined)
+            const active = timeEntries.find(e => !e.endTime);
+            
+            if (active) {
+                activeEntry = active;
+                document.getElementById('active-timer').style.display = 'block';
+                document.getElementById('new-task-form').style.display = 'none';
+                
+                const cp = counterparties.find(c => c.id === active.counterpartyId);
+                document.getElementById('timer-counterparty').textContent = cp ? cp.name : '❓ Удаленный контрагент';
+                document.getElementById('timer-task').textContent = active.task;
+                
+                startTicking();
+            } else {
+                activeEntry = null;
+                document.getElementById('active-timer').style.display = 'none';
+                document.getElementById('new-task-form').style.display = 'block';
+                stopTicking();
+            }
+            // Всегда обновляем список последних задач при проверке таймера
+            renderRecentTasks();
+        }
+
+        function startTicking() {
+            stopTicking();
+            updateTimerDisplay();
+            timerInterval = setInterval(updateTimerDisplay, 1000);
+        }
+
+        function stopTicking() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function updateTimerDisplay() {
+            if (!activeEntry) return;
+            const diff = Date.now() - activeEntry.startTime;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            
+            document.getElementById('timer-display').textContent = 
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // Ручной ввод
+        document.getElementById('btn-show-manual').addEventListener('click', () => {
+            document.getElementById('manual-form').style.display = 'block';
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('manual-end').value = now.toISOString().slice(0, 16);
+            const hourAgo = new Date(now.getTime() - 3600000);
+            document.getElementById('manual-start').value = hourAgo.toISOString().slice(0, 16);
+        });
+
+        document.getElementById('btn-cancel-manual').addEventListener('click', () => {
+            document.getElementById('manual-form').style.display = 'none';
+        });
+
+        document.getElementById('btn-save-manual').addEventListener('click', () => {
+            const cpId = document.getElementById('manual-counterparty').value;
+            const task = document.getElementById('manual-description').value.trim();
+            const startVal = document.getElementById('manual-start').value;
+            const endVal = document.getElementById('manual-end').value;
+
+            if (!cpId || !task || !startVal || !endVal) return alert('Заполните все поля');
+            
+            const startTime = new Date(startVal).getTime();
+            const endTime = new Date(endVal).getTime();
+            
+            if (endTime <= startTime) return alert('Время окончания должно быть позже начала');
+
+            db.ref('timetracker/time_entries').push({
+                counterpartyId: cpId,
+                task: task,
+                startTime: startTime,
+                endTime: endTime,
+                isManual: true
+            }).then(() => {
+                document.getElementById('manual-form').style.display = 'none';
+                document.getElementById('manual-description').value = '';
+            });
+        });
+
+        // ==========================================
+        // ПОСЛЕДНИЕ ЗАДАЧИ
+        // ==========================================
+        function renderRecentTasks() {
+            const list = document.getElementById('recent-tasks-list');
+            // Берем только завершенные задачи, сортируем по времени (новые сверху), берем 10
+            const completed = timeEntries
+                .filter(e => e.endTime)
+                .sort((a, b) => b.startTime - a.startTime)
+                .slice(0, 10);
+
+            if (completed.length === 0) {
+                list.innerHTML = '<div class="empty">Пока нет завершенных задач</div>';
+                return;
+            }
+
+            list.innerHTML = completed.map(e => {
+                const cp = counterparties.find(c => c.id === e.counterpartyId);
+                const cpName = cp ? cp.name : '❓ Удаленный';
+                const start = new Date(e.startTime);
+                const end = new Date(e.endTime);
+                const durationMin = (e.endTime - e.startTime) / 60000;
+                const h = Math.floor(durationMin / 60);
+                const m = Math.round(durationMin % 60);
+                
+                return `
+                    <div class="card recent-task-card">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <strong>${cpName}</strong>
+                            <span style="color:var(--primary); font-weight:bold;">${h}ч ${String(m).padStart(2, '0')}м</span>
+                        </div>
+                        <div style="font-size:14px; color:var(--text); margin-bottom:5px;">${e.task}</div>
+                        <div style="font-size:12px; color:var(--grey);">
+                            📅 ${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} – ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            ${e.isManual ? ' <span style="color:var(--warning);">(вручную)</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // СТАТИСТИКА И ЭКСПОРТ
+        // ==========================================
+        function setDefaultDates() {
+            const today = new Date();
+            // 1-е число текущего месяца
+            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            const formatDate = (date) => date.toISOString().split('T')[0];
+            document.getElementById('stat-start-date').value = formatDate(startOfMonth);
+            document.getElementById('stat-end-date').value = formatDate(today);
+        }
+
+        document.getElementById('btn-apply-filter').addEventListener('click', renderStats);
+
+        function renderStats() {
+            const startDate = new Date(document.getElementById('stat-start-date').value);
+            startDate.setHours(0, 0, 0, 0);
+            
+            const endDate = new Date(document.getElementById('stat-end-date').value);
+            endDate.setHours(23, 59, 59, 999);
+
+            // Фильтруем завершенные записи за период
+            const filtered = timeEntries.filter(e => 
+                e.endTime !== null && 
+                e.endTime !== undefined &&
+                e.startTime >= startDate.getTime() && 
+                e.startTime <= endDate.getTime()
+            );
+
+            // Группировка по контрагентам
+            const stats = {};
+            let totalMinutes = 0;
+
+            filtered.forEach(e => {
+                const cp = counterparties.find(c => c.id === e.counterpartyId);
+                const cpName = cp ? cp.name : '❓ Удаленный';
+                const durationMs = e.endTime - e.startTime;
+                const durationMin = durationMs / 60000;
+                
+                if (!stats[cpName]) stats[cpName] = 0;
+                stats[cpName] += durationMin;
+                totalMinutes += durationMin;
+            });
+
+            // Рендер таблицы
+            const tbody = document.getElementById('stats-tbody');
+            if (Object.keys(stats).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="empty">Нет данных за выбранный период</td></tr>';
+            } else {
+                let html = '';
+                const sortedCp = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+                
+                sortedCp.forEach(([name, mins]) => {
+                    const hoursDecimal = (mins / 60).toFixed(2);
+                    const h = Math.floor(mins / 60);
+                    const m = Math.round(mins % 60);
+                    const timeStr = `${h}ч ${String(m).padStart(2, '0')}м`;
+                    
+                    html += `<tr>
+                        <td>${name}</td>
+                        <td>${hoursDecimal} ч</td>
+                        <td>${timeStr}</td>
+                    </tr>`;
+                });
+                
+                const totalH = (totalMinutes / 60).toFixed(2);
+                const totalH_str = `${Math.floor(totalMinutes / 60)}ч ${String(Math.round(totalMinutes % 60)).padStart(2, '0')}м`;
+                html += `<tr class="total-row">
+                    <td>ИТОГО</td>
+                    <td>${totalH} ч</td>
+                    <td>${totalH_str}</td>
+                </tr>`;
+                
+                tbody.innerHTML = html;
+            }
+
+            // Рендер детализации
+            const detailsList = document.getElementById('details-list');
+            if (filtered.length === 0) {
+                detailsList.innerHTML = '<div class="empty">Нет записей</div>';
+            } else {
+                detailsList.innerHTML = filtered.map(e => {
+                    const cp = counterparties.find(c => c.id === e.counterpartyId);
+                    const cpName = cp ? cp.name : '❓ Удаленный';
+                    const start = new Date(e.startTime);
+                    const end = new Date(e.endTime);
+                    const durationMin = (e.endTime - e.startTime) / 60000;
+                    const h = Math.floor(durationMin / 60);
+                    const m = Math.round(durationMin % 60);
+                    
+                    return `
+                        <div class="card" style="padding: 12px; margin-bottom: 10px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                <strong>${cpName}</strong>
+                                <span style="color:var(--primary); font-weight:bold;">${h}ч ${String(m).padStart(2, '0')}м</span>
+                            </div>
+                            <div style="font-size:14px; color:var(--grey); margin-bottom:5px;">${e.task}</div>
+                            <div style="font-size:12px; color:var(--grey);">
+                                📅 ${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} – ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                ${e.isManual ? ' <span style="color:var(--warning);">(вручную)</span>' : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        // Экспорт в CSV
+        document.getElementById('btn-export-csv').addEventListener('click', () => {
+            const startDate = new Date(document.getElementById('stat-start-date').value);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(document.getElementById('stat-end-date').value);
+            endDate.setHours(23, 59, 59, 999);
+
+            const filtered = timeEntries.filter(e => 
+                e.endTime !== null && 
+                e.endTime !== undefined &&
+                e.startTime >= startDate.getTime() && 
+                e.startTime <= endDate.getTime()
+            );
+
+            if (filtered.length === 0) return alert('Нет данных для выгрузки');
+
+            let csvContent = "\uFEFFКонтрагент;Задача;Дата;Начало;Конец;Часы (дробные);Часы (чч:мм)\n";
+            
+            filtered.forEach(e => {
+                const cp = counterparties.find(c => c.id === e.counterpartyId);
+                const cpName = cp ? cp.name.replace(/;/g, ',') : 'Удаленный';
+                const task = (e.task || '').replace(/;/g, ',').replace(/\n/g, ' ');
+                const start = new Date(e.startTime);
+                const end = new Date(e.endTime);
+                const durationMin = (e.endTime - e.startTime) / 60000;
+                const hoursDecimal = (durationMin / 60).toFixed(2);
+                const h = Math.floor(durationMin / 60);
+                const m = Math.round(durationMin % 60);
+                const timeStr = `${h}ч ${String(m).padStart(2, '0')}м`;
+                
+                const dateStr = start.toLocaleDateString('ru-RU');
+                const startStr = start.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                const endStr = end.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                
+                csvContent += `${cpName};${task};${dateStr};${startStr};${endStr};${hoursDecimal};${timeStr}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `tracker_stats_${startDate.toISOString().split('T')[0]}_to_${endDate.toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Запуск
+        init();
+    </script>
+</body>
+</html>
