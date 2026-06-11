@@ -9,7 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
     <style>
-        :root { --primary: #1976d2; --bg: #f5f5f5; --card: #fff; --text: #333; --danger: #d32f2f; --grey: #757575; --success: #388e3c; --warning: #f57c00; }
+        :root { --primary: #1976d2; --bg: #f5f5f5; --card: #fff; --text: #333; --danger: #d32f2f; --grey: #757575; --success: #388e3c; --warning: #f57c00; --accent: #1976d2; }
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; padding-bottom: 90px; }
         h1, h2 { color: var(--primary); margin-top: 0; font-size: 22px; }
@@ -25,18 +25,13 @@
         .btn-danger { background: var(--danger); }
         .btn-success { background: var(--success); }
         .btn-warning { background: var(--warning); }
-        .btn-small { padding: 8px; font-size: 14px; width: auto; }
+        .btn-small { padding: 8px; font-size: 14px; width: auto; margin-bottom: 0; }
         .empty { text-align: center; color: var(--grey); padding: 20px; }
         .row { display: flex; gap: 10px; }
         .row > * { flex: 1; margin-bottom: 10px; }
         
         /* Активный таймер */
-        .active-timer-card {
-            background: #e3f2fd;
-            border: 2px solid var(--primary);
-            text-align: center;
-            animation: pulse 2s infinite;
-        }
+        .active-timer-card { background: #e3f2fd; border: 2px solid var(--primary); text-align: center; animation: pulse 2s infinite; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4); }
             70% { box-shadow: 0 0 0 10px rgba(25, 118, 210, 0); }
@@ -46,10 +41,18 @@
         .timer-info { font-size: 16px; color: var(--text); margin-bottom: 15px; }
         .timer-info strong { display: block; font-size: 18px; margin-bottom: 5px; }
 
-        /* Карточка недавней задачи */
-        .recent-task-card {
-            padding: 12px; margin-bottom: 10px; border-left: 4px solid var(--success);
-        }
+        /* Карточки задач */
+        .recent-task-card { padding: 12px; margin-bottom: 10px; border-left: 4px solid var(--success); }
+        .task-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .task-actions button { flex: 1; }
+
+        /* Форма редактирования задачи */
+        .edit-task-form { background: #fff3e0; padding: 12px; border-radius: 6px; border: 2px solid var(--warning); }
+        .edit-task-form label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; margin-top: 8px; font-weight: bold;}
+        .edit-task-form label:first-child { margin-top: 0; }
+        .edit-task-form select, .edit-task-form input { margin-bottom: 8px; }
+        .edit-task-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .edit-task-actions button { flex: 1; margin-bottom: 0; }
 
         /* Таблица статистики */
         .stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -68,7 +71,7 @@
     <div id="view-tracker" class="view active">
         <h1>🕒 Трекер времени</h1>
         
-        <!-- Активный таймер (скрыт, если нет активной задачи) -->
+        <!-- Активный таймер -->
         <div id="active-timer" class="card active-timer-card" style="display: none;">
             <h3>⏱️ Идет работа</h3>
             <div class="timer-info">
@@ -91,7 +94,7 @@
 
         <button id="btn-show-manual" class="btn-warning" style="margin-top: 10px;">➕ Добавить время вручную</button>
 
-        <!-- Форма ручного ввода (скрыта) -->
+        <!-- Форма ручного ввода -->
         <div id="manual-form" class="card" style="display: none; background: #fff3e0;">
             <h3>✏️ Ручной ввод времени</h3>
             <select id="manual-counterparty"></select>
@@ -106,7 +109,6 @@
             </div>
         </div>
 
-        <!-- Список последних задач -->
         <h2 style="margin-top: 30px;">📋 Последние 10 задач</h2>
         <div id="recent-tasks-list"></div>
     </div>
@@ -160,9 +162,6 @@
     </div>
 
     <script>
-        // ==========================================
-        // КОНФИГУРАЦИЯ FIREBASE
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyC2UyhWjiI_y7vBSHSBRmwyKsjwj0b3iYA",
             authDomain: "garden-orders.firebaseapp.com",
@@ -176,42 +175,28 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Состояние приложения
         let counterparties = [];
         let timeEntries = [];
         let activeEntry = null;
         let timerInterval = null;
+        let editingTaskId = null; // ID задачи, которая сейчас редактируется
 
-        // ==========================================
-        // ИНИЦИАЛИЗАЦИЯ И ПОДПИСКИ
-        // ==========================================
         function init() {
             setDefaultDates();
             
-            // Загрузка контрагентов
             db.ref('timetracker/counterparties').on('value', (snapshot) => {
                 counterparties = [];
                 const data = snapshot.val();
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        counterparties.push({ id: key, ...data[key] });
-                    });
-                }
+                if (data) Object.keys(data).forEach(key => counterparties.push({ id: key, ...data[key] }));
                 counterparties.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
                 renderCounterparties();
                 updateCounterpartySelects();
             });
 
-            // Загрузка записей времени
             db.ref('timetracker/time_entries').on('value', (snapshot) => {
                 timeEntries = [];
                 const data = snapshot.val();
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        timeEntries.push({ id: key, ...data[key] });
-                    });
-                }
-                // Сортировка по времени начала (новые сверху)
+                if (data) Object.keys(data).forEach(key => timeEntries.push({ id: key, ...data[key] }));
                 timeEntries.sort((a, b) => b.startTime - a.startTime);
                 
                 checkActiveTimer();
@@ -219,9 +204,6 @@
             });
         }
 
-        // ==========================================
-        // НАВИГАЦИЯ
-        // ==========================================
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -229,31 +211,27 @@
                 tab.classList.add('active');
                 document.getElementById('view-' + tab.dataset.tab).classList.add('active');
                 
-                if (tab.dataset.tab === 'stats') renderStats();
+                if (tab.dataset.tab === 'stats') {
+                    editingTaskId = null; // Сброс редактирования при смене вкладки
+                    renderStats();
+                } else if (tab.dataset.tab === 'tracker') {
+                    renderRecentTasks();
+                }
             });
         });
 
-        // ==========================================
-        // КОНТРАГЕНТЫ
-        // ==========================================
+        // ================= КОНТРАГЕНТЫ =================
         document.getElementById('btn-add-cp').addEventListener('click', () => {
             const name = document.getElementById('cp-name').value.trim();
             if (!name) return alert('Введите название');
-            
-            db.ref('timetracker/counterparties').push({
-                name: name,
-                createdAt: Date.now()
-            }).then(() => {
+            db.ref('timetracker/counterparties').push({ name: name, createdAt: Date.now() }).then(() => {
                 document.getElementById('cp-name').value = '';
             });
         });
 
         function renderCounterparties() {
             const list = document.getElementById('cp-list');
-            if (counterparties.length === 0) {
-                list.innerHTML = '<div class="empty">Пока нет контрагентов</div>';
-                return;
-            }
+            if (counterparties.length === 0) { list.innerHTML = '<div class="empty">Пока нет контрагентов</div>'; return; }
             list.innerHTML = counterparties.map(cp => `
                 <div class="card" style="padding: 12px; display: flex; justify-content: space-between; align-items: center;">
                     <strong>${cp.name}</strong>
@@ -269,57 +247,37 @@
         };
 
         function updateCounterpartySelects() {
-            const options = '<option value="">— Выберите —</option>' + 
-                counterparties.map(cp => `<option value="${cp.id}">${cp.name}</option>`).join('');
+            const options = '<option value="">— Выберите —</option>' + counterparties.map(cp => `<option value="${cp.id}">${cp.name}</option>`).join('');
             document.getElementById('task-counterparty').innerHTML = options;
             document.getElementById('manual-counterparty').innerHTML = options;
         }
 
-        // ==========================================
-        // ТРЕКЕР (ТАЙМЕР)
-        // ==========================================
+        // ================= ТРЕКЕР =================
         document.getElementById('btn-start').addEventListener('click', () => {
             const cpId = document.getElementById('task-counterparty').value;
             const task = document.getElementById('task-description').value.trim();
-            
             if (!cpId) return alert('Выберите контрагента');
             if (!task) return alert('Введите описание задачи');
 
-            const newEntry = {
-                counterpartyId: cpId,
-                task: task,
-                startTime: Date.now(),
-                endTime: null,
-                isManual: false
-            };
-
-            db.ref('timetracker/time_entries').push(newEntry).then(() => {
-                document.getElementById('task-description').value = '';
-            });
+            db.ref('timetracker/time_entries').push({
+                counterpartyId: cpId, task: task, startTime: Date.now(), endTime: null, isManual: false
+            }).then(() => { document.getElementById('task-description').value = ''; });
         });
 
         document.getElementById('btn-stop').addEventListener('click', () => {
             if (!activeEntry) return;
-            db.ref('timetracker/time_entries/' + activeEntry.id).update({
-                endTime: Date.now()
-            }).then(() => {
-                // После успешного сохранения база данных обновится и сама вызовет checkActiveTimer
-            });
+            db.ref('timetracker/time_entries/' + activeEntry.id).update({ endTime: Date.now() });
         });
 
         function checkActiveTimer() {
-            // Ищем запись, у которой НЕТ endTime (надежная проверка на null или undefined)
             const active = timeEntries.find(e => !e.endTime);
-            
             if (active) {
                 activeEntry = active;
                 document.getElementById('active-timer').style.display = 'block';
                 document.getElementById('new-task-form').style.display = 'none';
-                
                 const cp = counterparties.find(c => c.id === active.counterpartyId);
-                document.getElementById('timer-counterparty').textContent = cp ? cp.name : '❓ Удаленный контрагент';
+                document.getElementById('timer-counterparty').textContent = cp ? cp.name : '❓ Удаленный';
                 document.getElementById('timer-task').textContent = active.task;
-                
                 startTicking();
             } else {
                 activeEntry = null;
@@ -327,7 +285,6 @@
                 document.getElementById('new-task-form').style.display = 'block';
                 stopTicking();
             }
-            // Всегда обновляем список последних задач при проверке таймера
             renderRecentTasks();
         }
 
@@ -338,111 +295,184 @@
         }
 
         function stopTicking() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
         }
 
         function updateTimerDisplay() {
             if (!activeEntry) return;
             const diff = Date.now() - activeEntry.startTime;
-            const hours = Math.floor(diff / 3600000);
-            const minutes = Math.floor((diff % 3600000) / 60000);
-            const seconds = Math.floor((diff % 60000) / 1000);
-            
-            document.getElementById('timer-display').textContent = 
-                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            document.getElementById('timer-display').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         }
 
-        // Ручной ввод
         document.getElementById('btn-show-manual').addEventListener('click', () => {
             document.getElementById('manual-form').style.display = 'block';
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('manual-end').value = now.toISOString().slice(0, 16);
             const hourAgo = new Date(now.getTime() - 3600000);
             document.getElementById('manual-start').value = hourAgo.toISOString().slice(0, 16);
         });
 
-        document.getElementById('btn-cancel-manual').addEventListener('click', () => {
-            document.getElementById('manual-form').style.display = 'none';
-        });
+        document.getElementById('btn-cancel-manual').addEventListener('click', () => { document.getElementById('manual-form').style.display = 'none'; });
 
         document.getElementById('btn-save-manual').addEventListener('click', () => {
             const cpId = document.getElementById('manual-counterparty').value;
             const task = document.getElementById('manual-description').value.trim();
             const startVal = document.getElementById('manual-start').value;
             const endVal = document.getElementById('manual-end').value;
-
             if (!cpId || !task || !startVal || !endVal) return alert('Заполните все поля');
             
             const startTime = new Date(startVal).getTime();
             const endTime = new Date(endVal).getTime();
-            
             if (endTime <= startTime) return alert('Время окончания должно быть позже начала');
 
-            db.ref('timetracker/time_entries').push({
-                counterpartyId: cpId,
-                task: task,
-                startTime: startTime,
-                endTime: endTime,
-                isManual: true
-            }).then(() => {
+            db.ref('timetracker/time_entries').push({ counterpartyId: cpId, task: task, startTime, endTime, isManual: true }).then(() => {
                 document.getElementById('manual-form').style.display = 'none';
                 document.getElementById('manual-description').value = '';
             });
         });
 
-        // ==========================================
-        // ПОСЛЕДНИЕ ЗАДАЧИ
-        // ==========================================
-        function renderRecentTasks() {
-            const list = document.getElementById('recent-tasks-list');
-            // Берем только завершенные задачи, сортируем по времени (новые сверху), берем 10
-            const completed = timeEntries
-                .filter(e => e.endTime)
-                .sort((a, b) => b.startTime - a.startTime)
-                .slice(0, 10);
-
-            if (completed.length === 0) {
-                list.innerHTML = '<div class="empty">Пока нет завершенных задач</div>';
-                return;
-            }
-
-            list.innerHTML = completed.map(e => {
-                const cp = counterparties.find(c => c.id === e.counterpartyId);
-                const cpName = cp ? cp.name : '❓ Удаленный';
-                const start = new Date(e.startTime);
-                const end = new Date(e.endTime);
-                const durationMin = (e.endTime - e.startTime) / 60000;
-                const h = Math.floor(durationMin / 60);
-                const m = Math.round(durationMin % 60);
-                
-                return `
-                    <div class="card recent-task-card">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                            <strong>${cpName}</strong>
-                            <span style="color:var(--primary); font-weight:bold;">${h}ч ${String(m).padStart(2, '0')}м</span>
-                        </div>
-                        <div style="font-size:14px; color:var(--text); margin-bottom:5px;">${e.task}</div>
-                        <div style="font-size:12px; color:var(--grey);">
-                            📅 ${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} – ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            ${e.isManual ? ' <span style="color:var(--warning);">(вручную)</span>' : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
+        // ================= РЕНДЕР ЗАДАЧ (С УЧЕТОМ РЕДАКТИРОВАНИЯ) =================
+        function formatDT(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            return d.toISOString().slice(0, 16);
         }
 
-        // ==========================================
-        // СТАТИСТИКА И ЭКСПОРТ
-        // ==========================================
+        function getEditTaskFormHTML(e) {
+            const cpOptions = counterparties.map(c => `<option value="${c.id}" ${c.id === e.counterpartyId ? 'selected' : ''}>${c.name}</option>`).join('');
+            return `
+                <div class="card edit-task-form" data-task-id="${e.id}">
+                    <div style="font-weight:bold; margin-bottom:10px; color:var(--warning);">✏️ Редактирование записи</div>
+                    <label>Контрагент:</label>
+                    <select id="edit-task-cp">${cpOptions}</select>
+                    <label>Задача:</label>
+                    <input type="text" id="edit-task-desc" value="${e.task || ''}">
+                    <label>Начало:</label>
+                    <input type="datetime-local" id="edit-task-start" value="${formatDT(e.startTime)}">
+                    <label>Окончание (оставьте пустым, если задача еще идет):</label>
+                    <input type="datetime-local" id="edit-task-end" value="${formatDT(e.endTime)}">
+                    <div class="edit-task-actions">
+                        <button class="btn-small btn-success" data-save-task="${e.id}">💾 Сохранить</button>
+                        <button class="btn-small" style="background: var(--grey);" data-cancel-task="${e.id}">Отмена</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTaskCard(e) {
+            if (editingTaskId === e.id) return getEditTaskFormHTML(e);
+
+            const cp = counterparties.find(c => c.id === e.counterpartyId);
+            const cpName = cp ? cp.name : '❓ Удаленный';
+            const start = new Date(e.startTime);
+            const end = e.endTime ? new Date(e.endTime) : null;
+            const durationMin = e.endTime ? (e.endTime - e.startTime) / 60000 : (Date.now() - e.startTime) / 60000;
+            const h = Math.floor(durationMin / 60);
+            const m = Math.round(durationMin % 60);
+            const isActive = !e.endTime;
+
+            let timeStr = isActive 
+                ? `<span style="color:var(--primary); font-weight:bold;">Идет...</span>`
+                : `<span style="color:var(--primary); font-weight:bold;">${h}ч ${String(m).padStart(2, '0')}м</span>`;
+
+            return `
+                <div class="card recent-task-card" data-task-id="${e.id}">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <strong>${cpName}</strong>
+                        ${timeStr}
+                    </div>
+                    <div style="font-size:14px; color:var(--text); margin-bottom:5px;">${e.task}</div>
+                    <div style="font-size:12px; color:var(--grey); margin-bottom: 8px;">
+                        📅 ${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${end ? ' – ' + end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ' <span style="color:var(--success);">(активно)</span>'}
+                        ${e.isManual ? ' <span style="color:var(--warning);">(вручную)</span>' : ''}
+                    </div>
+                    <div class="task-actions">
+                        <button class="btn-small" style="background: var(--accent);" data-edit-task="${e.id}">✏️ Изменить</button>
+                        <button class="btn-small btn-danger" data-delete-task="${e.id}">🗑️ Удалить</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderRecentTasks() {
+            const list = document.getElementById('recent-tasks-list');
+            const completed = timeEntries.filter(e => e.endTime).sort((a, b) => b.startTime - a.startTime).slice(0, 10);
+            // Если есть активная задача, добавим её в начало списка для наглядности
+            const active = timeEntries.find(e => !e.endTime);
+            const displayList = active ? [active, ...completed].slice(0, 10) : completed.slice(0, 10);
+
+            if (displayList.length === 0) {
+                list.innerHTML = '<div class="empty">Пока нет задач</div>';
+                return;
+            }
+            list.innerHTML = displayList.map(e => renderTaskCard(e)).join('');
+        }
+
+        // ================= ДЕЙСТВИЯ С ЗАДАЧАМИ =================
+        function deleteTask(id) {
+            if (confirm('Удалить эту запись о времени?')) {
+                if (activeEntry && activeEntry.id === id) {
+                    stopTicking();
+                    activeEntry = null;
+                }
+                db.ref('timetracker/time_entries/' + id).remove();
+            }
+        }
+
+        function startEditTask(id) {
+            editingTaskId = id;
+            renderRecentTasks(); // Перерисует список, подставив форму
+        }
+
+        function cancelEditTask() {
+            editingTaskId = null;
+            renderRecentTasks();
+        }
+
+        function saveTaskEdit(id) {
+            const cpId = document.getElementById('edit-task-cp').value;
+            const task = document.getElementById('edit-task-desc').value.trim();
+            const startVal = document.getElementById('edit-task-start').value;
+            const endVal = document.getElementById('edit-task-end').value;
+
+            if (!cpId || !task || !startVal) return alert('Заполните контрагента, задачу и время начала');
+
+            const startTime = new Date(startVal).getTime();
+            const endTime = endVal ? new Date(endVal).getTime() : null;
+
+            if (endTime && endTime <= startTime) return alert('Время окончания должно быть позже начала');
+
+            const updateData = { counterpartyId: cpId, task: task, startTime: startTime, endTime: endTime };
+            
+            db.ref('timetracker/time_entries/' + id).update(updateData).then(() => {
+                editingTaskId = null;
+                checkActiveTimer(); // Перепроверит статус таймера
+            }).catch(err => alert('Ошибка: ' + err.message));
+        }
+
+        // Глобальный делегат событий для кнопок задач
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            if (target.hasAttribute('data-edit-task')) {
+                startEditTask(target.getAttribute('data-edit-task'));
+            } else if (target.hasAttribute('data-delete-task')) {
+                deleteTask(target.getAttribute('data-delete-task'));
+            } else if (target.hasAttribute('data-save-task')) {
+                saveTaskEdit(target.getAttribute('data-save-task'));
+            } else if (target.hasAttribute('data-cancel-task')) {
+                cancelEditTask();
+            }
+        });
+
+        // ================= СТАТИСТИКА =================
         function setDefaultDates() {
             const today = new Date();
-            // 1-е число текущего месяца
             const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            
             const formatDate = (date) => date.toISOString().split('T')[0];
             document.getElementById('stat-start-date').value = formatDate(startOfMonth);
             document.getElementById('stat-end-date').value = formatDate(today);
@@ -453,97 +483,53 @@
         function renderStats() {
             const startDate = new Date(document.getElementById('stat-start-date').value);
             startDate.setHours(0, 0, 0, 0);
-            
             const endDate = new Date(document.getElementById('stat-end-date').value);
             endDate.setHours(23, 59, 59, 999);
 
-            // Фильтруем завершенные записи за период
             const filtered = timeEntries.filter(e => 
-                e.endTime !== null && 
-                e.endTime !== undefined &&
-                e.startTime >= startDate.getTime() && 
-                e.startTime <= endDate.getTime()
+                e.endTime !== null && e.endTime !== undefined &&
+                e.startTime >= startDate.getTime() && e.startTime <= endDate.getTime()
             );
 
-            // Группировка по контрагентам
             const stats = {};
             let totalMinutes = 0;
 
             filtered.forEach(e => {
                 const cp = counterparties.find(c => c.id === e.counterpartyId);
                 const cpName = cp ? cp.name : '❓ Удаленный';
-                const durationMs = e.endTime - e.startTime;
-                const durationMin = durationMs / 60000;
-                
+                const durationMin = (e.endTime - e.startTime) / 60000;
                 if (!stats[cpName]) stats[cpName] = 0;
                 stats[cpName] += durationMin;
                 totalMinutes += durationMin;
             });
 
-            // Рендер таблицы
             const tbody = document.getElementById('stats-tbody');
             if (Object.keys(stats).length === 0) {
                 tbody.innerHTML = '<tr><td colspan="3" class="empty">Нет данных за выбранный период</td></tr>';
             } else {
                 let html = '';
                 const sortedCp = Object.entries(stats).sort((a, b) => b[1] - a[1]);
-                
                 sortedCp.forEach(([name, mins]) => {
                     const hoursDecimal = (mins / 60).toFixed(2);
                     const h = Math.floor(mins / 60);
                     const m = Math.round(mins % 60);
-                    const timeStr = `${h}ч ${String(m).padStart(2, '0')}м`;
-                    
-                    html += `<tr>
-                        <td>${name}</td>
-                        <td>${hoursDecimal} ч</td>
-                        <td>${timeStr}</td>
-                    </tr>`;
+                    html += `<tr><td>${name}</td><td>${hoursDecimal} ч</td><td>${h}ч ${String(m).padStart(2, '0')}м</td></tr>`;
                 });
-                
                 const totalH = (totalMinutes / 60).toFixed(2);
-                const totalH_str = `${Math.floor(totalMinutes / 60)}ч ${String(Math.round(totalMinutes % 60)).padStart(2, '0')}м`;
-                html += `<tr class="total-row">
-                    <td>ИТОГО</td>
-                    <td>${totalH} ч</td>
-                    <td>${totalH_str}</td>
-                </tr>`;
-                
+                const tH = Math.floor(totalMinutes / 60);
+                const tM = Math.round(totalMinutes % 60);
+                html += `<tr class="total-row"><td>ИТОГО</td><td>${totalH} ч</td><td>${tH}ч ${String(tM).padStart(2, '0')}м</td></tr>`;
                 tbody.innerHTML = html;
             }
 
-            // Рендер детализации
             const detailsList = document.getElementById('details-list');
             if (filtered.length === 0) {
                 detailsList.innerHTML = '<div class="empty">Нет записей</div>';
             } else {
-                detailsList.innerHTML = filtered.map(e => {
-                    const cp = counterparties.find(c => c.id === e.counterpartyId);
-                    const cpName = cp ? cp.name : '❓ Удаленный';
-                    const start = new Date(e.startTime);
-                    const end = new Date(e.endTime);
-                    const durationMin = (e.endTime - e.startTime) / 60000;
-                    const h = Math.floor(durationMin / 60);
-                    const m = Math.round(durationMin % 60);
-                    
-                    return `
-                        <div class="card" style="padding: 12px; margin-bottom: 10px;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                                <strong>${cpName}</strong>
-                                <span style="color:var(--primary); font-weight:bold;">${h}ч ${String(m).padStart(2, '0')}м</span>
-                            </div>
-                            <div style="font-size:14px; color:var(--grey); margin-bottom:5px;">${e.task}</div>
-                            <div style="font-size:12px; color:var(--grey);">
-                                📅 ${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} – ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                ${e.isManual ? ' <span style="color:var(--warning);">(вручную)</span>' : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                detailsList.innerHTML = filtered.map(e => renderTaskCard(e)).join('');
             }
         }
 
-        // Экспорт в CSV
         document.getElementById('btn-export-csv').addEventListener('click', () => {
             const startDate = new Date(document.getElementById('stat-start-date').value);
             startDate.setHours(0, 0, 0, 0);
@@ -551,16 +537,13 @@
             endDate.setHours(23, 59, 59, 999);
 
             const filtered = timeEntries.filter(e => 
-                e.endTime !== null && 
-                e.endTime !== undefined &&
-                e.startTime >= startDate.getTime() && 
-                e.startTime <= endDate.getTime()
+                e.endTime !== null && e.endTime !== undefined &&
+                e.startTime >= startDate.getTime() && e.startTime <= endDate.getTime()
             );
 
             if (filtered.length === 0) return alert('Нет данных для выгрузки');
 
             let csvContent = "\uFEFFКонтрагент;Задача;Дата;Начало;Конец;Часы (дробные);Часы (чч:мм)\n";
-            
             filtered.forEach(e => {
                 const cp = counterparties.find(c => c.id === e.counterpartyId);
                 const cpName = cp ? cp.name.replace(/;/g, ',') : 'Удаленный';
@@ -571,13 +554,8 @@
                 const hoursDecimal = (durationMin / 60).toFixed(2);
                 const h = Math.floor(durationMin / 60);
                 const m = Math.round(durationMin % 60);
-                const timeStr = `${h}ч ${String(m).padStart(2, '0')}м`;
                 
-                const dateStr = start.toLocaleDateString('ru-RU');
-                const startStr = start.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
-                const endStr = end.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
-                
-                csvContent += `${cpName};${task};${dateStr};${startStr};${endStr};${hoursDecimal};${timeStr}\n`;
+                csvContent += `${cpName};${task};${start.toLocaleDateString('ru-RU')};${start.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})};${end.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})};${hoursDecimal};${h}ч ${String(m).padStart(2, '0')}м\n`;
             });
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -590,7 +568,6 @@
             document.body.removeChild(link);
         });
 
-        // Запуск
         init();
     </script>
 </body>
