@@ -22,22 +22,22 @@
         input, select, button { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button:active { transform: scale(0.98); }
-        .btn-danger { background: var(--danger); padding: 8px; font-size: 14px; margin: 0; width: auto;}
-        .btn-edit { background: var(--accent); padding: 8px; font-size: 14px; margin: 0; width: auto;}
-        .btn-small { padding: 8px; font-size: 14px; width: auto; background: var(--accent);}
-        .btn-secondary { background: var(--grey); padding: 8px; font-size: 14px; width: auto;}
+        .btn-danger { background: var(--danger); }
+        .btn-edit { background: var(--accent); }
+        .btn-small { padding: 8px; font-size: 14px; width: auto; margin-bottom: 0; }
         .btn-cancel { background: var(--grey); display: none; }
         
-        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;}
         .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white;}
         .status-pending { background: #f57c00; }
         .status-done { background: #388e3c; }
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;}
         .controls select { margin-bottom: 0; flex: 1; min-width: 120px;}
         .empty { text-align: center; color: var(--grey); padding: 20px;}
-        .client-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        .client-phone { color: var(--grey); font-size: 14px; }
-        .plant-price { color: var(--money); font-weight: bold; font-size: 14px; }
+        
+        .client-row, .plant-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .client-phone, .plant-price { color: var(--grey); font-size: 14px; }
+        .plant-price { color: var(--money); font-weight: bold; }
+        
         .sync-status { position: fixed; top: 10px; right: 10px; padding: 5px 10px; background: #fff; border-radius: 20px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 200; }
         .sync-ok { color: var(--primary); }
         .sync-error { color: var(--danger); }
@@ -47,8 +47,9 @@
         .order-item select { flex: 2; margin-bottom: 0; min-width: 120px; }
         .order-item input { flex: 1; margin-bottom: 0; min-width: 60px; }
         .order-item .btn-remove { width: 40px; flex: 0 0 40px; padding: 8px; margin: 0; font-size: 18px; line-height: 1; }
-        .btn-add-item { background: var(--accent); margin-bottom: 15px; font-size: 14px; padding: 10px; }
+        .item-total { font-weight: bold; color: var(--money); min-width: 80px; text-align: right; font-size: 14px; }
         
+        .btn-add-item { background: var(--accent); margin-bottom: 15px; font-size: 14px; padding: 10px; }
         .form-container { transition: background 0.3s; padding: 15px; border-radius: 8px; }
         .form-container.editing { background: var(--edit-bg); border: 2px solid var(--money); }
         
@@ -58,18 +59,39 @@
         .group-subheader .sum { color: var(--money); font-size: 13px; }
         .group-item { margin-left: 15px; border-left: 3px solid #e0e0e0; padding-left: 10px; }
         .total-sum { background: var(--money); color: white; padding: 12px 15px; border-radius: 8px; margin: 15px 0; font-weight: bold; font-size: 16px; text-align: center; }
-        .order-price { color: var(--money); font-weight: bold; }
 
-        /* Стили для формы редактирования заказа */
-        .edit-order-form { background: var(--edit-bg); padding: 12px; border-radius: 6px; border: 2px solid var(--money); }
-        .edit-order-form label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; margin-top: 8px; }
+        /* Стили карточки заказа (как в трекере) */
+        .order-card {
+            padding: 12px; margin-bottom: 10px; border-left: 4px solid var(--primary);
+            display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+        }
+        .order-info { flex: 1; min-width: 0; }
+        .order-info-title { font-weight: bold; margin-bottom: 4px; word-wrap: break-word; }
+        .order-info-desc { font-size: 14px; color: var(--text); margin-bottom: 6px; word-wrap: break-word; }
+        .order-info-time { font-size: 12px; color: var(--grey); line-height: 1.4; }
+        .order-actions-col { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+        .order-buttons { display: flex; gap: 8px; }
+        
+        .btn-icon {
+            width: 36px; height: 36px; padding: 0; margin: 0; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; transition: 0.2s;
+        }
+        .btn-icon:active { transform: scale(0.9); }
+        .btn-icon-delete { background: #ffebee; border-color: #ffcdd2; }
+        .btn-icon-delete:active { background: #ffcdd2; }
+        .btn-icon-edit { background: #e3f2fd; border-color: #bbdefb; }
+        .btn-icon-edit:active { background: #bbdefb; }
+        .btn-icon-toggle { background: #e8f5e9; border-color: #c8e6c9; }
+        .btn-icon-toggle:active { background: #c8e6c9; }
+
+        .edit-order-form { background: var(--edit-bg); padding: 12px; border-radius: 6px; border: 2px solid var(--money); width: 100%; }
+        .edit-order-form label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; margin-top: 8px; font-weight: bold; }
         .edit-order-form label:first-child { margin-top: 0; }
         .edit-order-form select, .edit-order-form input { margin-bottom: 8px; }
         .edit-order-actions { display: flex; gap: 8px; margin-top: 12px; }
         .edit-order-actions button { flex: 1; margin-bottom: 0; }
-    }
     </style>
-    </head>
+</head>
 <body>
 
     <div id="sync-status" class="sync-status sync-wait">⏳ Подключение...</div>
@@ -168,7 +190,6 @@
         let plants  = [];
         let orders  = [];
 
-        // Состояние редактирования
         let editingClientId = null;
         let editingPlantId = null;
         let editingOrderId = null;
@@ -213,9 +234,26 @@
             if(tab === 'clients') { cancelEditClient(); renderClients(); }
             if(tab === 'plants')  { cancelEditPlant(); renderPlants(); }
             if(tab === 'orders') {
-                editingOrderId = null; // Сброс редактирования заказа при уходе с вкладки
+                editingOrderId = null;
                 updateClientSelect();
                 updateOrderItems();
+                
+                // ЛОГИКА КОРЗИНЫ (Пункт 4)
+                const cartClient = sessionStorage.getItem('cart_client');
+                if (cartClient) {
+                    document.getElementById('order-client').value = cartClient;
+                    sessionStorage.removeItem('cart_client');
+                }
+                const cartPlant = sessionStorage.getItem('cart_plant');
+                if (cartPlant) {
+                    const firstPlantSelect = document.querySelector('.item-plant');
+                    if (firstPlantSelect) {
+                        firstPlantSelect.value = cartPlant;
+                        updateItemPrice(0); // Обновить цену при автозаполнении
+                    }
+                    sessionStorage.removeItem('cart_plant');
+                }
+                
                 renderOrders();
             }
         }
@@ -225,18 +263,12 @@
             const name = document.getElementById('client-name').value.trim();
             const phone = document.getElementById('client-phone').value.trim();
             if(!name) { alert('Введите имя клиента'); return; }
-            
-            if(!editingClientId && clients.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-                alert('Такой клиент уже есть'); return;
-            }
+            if(!editingClientId && clients.some(c => c.name.toLowerCase() === name.toLowerCase())) { alert('Такой клиент уже есть'); return; }
 
             const id = editingClientId || Date.now();
             db.ref('clients/' + id).set({
                 name: name, phone: phone, createdAt: editingClientId ? clients.find(c=>c.id===id).createdAt : new Date().toISOString()
-            }).then(() => {
-                cancelEditClient();
-                setSyncStatus('ok', '✅ Сохранено');
-            }).catch(error => alert('Ошибка: ' + error.message));
+            }).then(() => { cancelEditClient(); setSyncStatus('ok', '✅ Сохранено'); }).catch(error => alert('Ошибка: ' + error.message));
         }
 
         function editClient(id) {
@@ -263,12 +295,14 @@
         }
 
         function deleteClient(id) {
-            const hasOrders = orders.some(o => o.clientId === id);
-            const msg = hasOrders ? 'У клиента есть заказы. Удалить? Заказы останутся с пометкой "Удалённый клиент".' : 'Удалить клиента?';
-            if(confirm(msg)) {
-                db.ref('clients/' + id).remove().then(() => setSyncStatus('ok', '✅ Удалено')).catch(error => alert('Ошибка: ' + error.message));
-            }
+            if(confirm('Удалить клиента?')) db.ref('clients/' + id).remove().catch(error => alert('Ошибка: ' + error.message));
         }
+
+        // ПУНКТ 4: Добавление в корзину
+        window.addToCartClient = function(id) {
+            sessionStorage.setItem('cart_client', id);
+            switchTab('orders');
+        };
 
         function renderClients() {
             const list = document.getElementById('clients-list');
@@ -282,8 +316,9 @@
                             ${c.phone ? `<div class="client-phone">📞 ${c.phone}</div>` : ''}
                         </div>
                         <div style="display:flex; gap:8px;">
-                            <button class="btn-edit" data-edit-client="${c.id}">✏️</button>
-                            <button class="btn-danger" data-delete-client="${c.id}">🗑️</button>
+                            <button class="btn-small btn-edit" style="background:#e8f5e9; color:var(--primary); border:1px solid #c8e6c9;" onclick="addToCartClient('${c.id}')" title="В заказ">🛒</button>
+                            <button class="btn-small btn-edit" data-edit-client="${c.id}">✏️</button>
+                            <button class="btn-small btn-danger" data-delete-client="${c.id}">🗑️</button>
                         </div>
                     </div>
                 </div>
@@ -300,10 +335,7 @@
             const id = editingPlantId || Date.now();
             db.ref('plants/' + id).set({
                 name: name, price: price, createdAt: editingPlantId ? plants.find(p=>p.id===id).createdAt : new Date().toISOString()
-            }).then(() => {
-                cancelEditPlant();
-                setSyncStatus('ok', '✅ Сохранено');
-            }).catch(error => alert('Ошибка: ' + error.message));
+            }).then(() => { cancelEditPlant(); setSyncStatus('ok', '✅ Сохранено'); }).catch(error => alert('Ошибка: ' + error.message));
         }
 
         function editPlant(id) {
@@ -330,12 +362,13 @@
         }
 
         function deletePlant(id) {
-            const hasOrders = orders.some(o => o.plantId === id);
-            const msg = hasOrders ? 'У растения есть заказы. Удалить?' : 'Удалить растение?';
-            if(confirm(msg)) {
-                db.ref('plants/' + id).remove().then(() => setSyncStatus('ok', '✅ Удалено')).catch(error => alert('Ошибка: ' + error.message));
-            }
+            if(confirm('Удалить растение?')) db.ref('plants/' + id).remove().catch(error => alert('Ошибка: ' + error.message));
         }
+
+        window.addToCartPlant = function(id) {
+            sessionStorage.setItem('cart_plant', id);
+            switchTab('orders');
+        };
 
         function renderPlants() {
             const list = document.getElementById('plants-list');
@@ -343,15 +376,16 @@
             const sorted = [...plants].sort((a,b) => a.name.localeCompare(b.name, 'ru'));
             list.innerHTML = sorted.map(p => `
                 <div class="card">
-                    <div class="client-row">
+                    <div class="plant-row">
                         <div style="flex:1">
                             <strong>${p.name}</strong>
                             ${p.price ? `<div class="plant-price">💰 ${p.price.toLocaleString('ru-RU')} ₽</div>` : ''}
                         </div>
                         <div style="display:flex; gap:8px;">
-                            <button class="btn-edit" data-edit-plant="${p.id}">✏️</button>
-                            <button class="btn-danger" data-delete-plant="${p.id}">🗑️</button>
-            </div>
+                            <button class="btn-small btn-edit" style="background:#e8f5e9; color:var(--primary); border:1px solid #c8e6c9;" onclick="addToCartPlant('${p.id}')" title="В заказ">🛒</button>
+                            <button class="btn-small btn-edit" data-edit-plant="${p.id}">✏️</button>
+                            <button class="btn-small btn-danger" data-delete-plant="${p.id}">🗑️</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -374,6 +408,7 @@
                 <select class="item-plant" onchange="updateItemPrice(${index})">${plantOptions}</select>
                 <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="1" oninput="updateItemTotal(${index})">
                 <input type="number" class="item-price" placeholder="Цена" min="0" step="0.01" value="0" oninput="updateItemTotal(${index})">
+                <span class="item-total">0 ₽</span>
                 <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>
             </div>`;
         }
@@ -393,6 +428,7 @@
                 item.innerHTML = `<select class="item-plant" onchange="updateItemPrice(${index})">${plantOptions}</select>
                     <input type="number" class="item-qty" placeholder="Кол-во" min="1" value="${currentQty || 1}" oninput="updateItemTotal(${index})">
                     <input type="number" class="item-price" placeholder="Цена" min="0" step="0.01" value="${currentPrice || 0}" oninput="updateItemTotal(${index})">
+                    <span class="item-total">${(currentQty * currentPrice || 0).toLocaleString('ru-RU')} ₽</span>
                     <button class="btn-danger btn-remove" data-remove-item="${index}">×</button>`;
                 if (currentPlantId) item.querySelector('.item-plant').value = currentPlantId;
             });
@@ -404,8 +440,22 @@
             const select = item.querySelector('.item-plant');
             const price = parseFloat(select.options[select.selectedIndex].getAttribute('data-price')) || 0;
             item.querySelector('.item-price').value = price;
+            updateItemTotal(index);
         }
-        function updateItemTotal(index) {} // Заглушка для будущей логики
+
+        // ПУНКТ 2: Живой пересчет суммы
+        function updateItemTotal(index) {
+            const items = document.querySelectorAll('.order-item');
+            const item = items[index];
+            if (!item) return;
+            const qty = parseInt(item.querySelector('.item-qty').value) || 0;
+            const price = parseFloat(item.querySelector('.item-price').value) || 0;
+            const total = qty * price;
+            const totalEl = item.querySelector('.item-total');
+            if (totalEl) {
+                totalEl.textContent = total.toLocaleString('ru-RU') + ' ₽';
+            }
+        }
 
         function addOrderItem() {
             const container = document.getElementById('order-items-container');
@@ -462,37 +512,12 @@
         // --- РЕДАКТИРОВАНИЕ ЗАКАЗА ---
         function startEditOrder(id) {
             editingOrderId = id;
-            const order = orders.find(o => o.id === id);
-            if(!order) return;
+            renderOrders(); // Перерисует список, подставив форму
+        }
 
-            const card = document.querySelector(`[data-order-card="${id}"]`);
-            if(!card) return;
-
-            const clientOptions = clients.map(c => `<option value="${c.id}" ${c.id === order.clientId ? 'selected' : ''}>${c.name}</option>`).join('');
-            const plantOptions = plants.map(p => `<option value="${p.id}" ${p.id === order.plantId ? 'selected' : ''}>${p.name}</option>`).join('');
-
-            card.innerHTML = `
-                <div class="edit-order-form">
-                    <div style="font-weight:bold; margin-bottom:10px; color:var(--primary);">✏️ Редактирование заказа</div>
-                    <label>Клиент:</label>
-                    <select id="edit-ord-client">${clientOptions}</select>
-                    <label>Растение:</label>
-                    <select id="edit-ord-plant">${plantOptions}</select>
-                    <div style="display:flex; gap:8px;">
-                        <div style="flex:1"><label>Кол-во:</label><input type="number" id="edit-ord-qty" value="${order.qty}" min="1"></div>
-                        <div style="flex:1"><label>Цена (₽):</label><input type="number" id="edit-ord-price" value="${order.price || 0}" min="0" step="0.01"></div>
-                    </div>
-                    <label>Статус:</label>
-                    <select id="edit-ord-status">
-                        <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>В работе</option>
-                        <option value="done" ${order.status === 'done' ? 'selected' : ''}>Выполнен</option>
-                    </select>
-                    <div class="edit-order-actions">
-                        <button class="btn-small" data-save-order="${id}">💾 Сохранить</button>
-                        <button class="btn-secondary" data-cancel-order="${id}">Отмена</button>
-                    </div>
-                </div>
-            `;
+        function cancelEditOrder() {
+            editingOrderId = null;
+            renderOrders();
         }
 
         function saveOrderEdit(id) {
@@ -504,8 +529,6 @@
 
             if(!clientId || !plantId || !qty || qty < 1) { alert('Заполните все поля корректно'); return; }
 
-            // ВАЖНО: Мы используем .update(), а не .set(), и НЕ передаем поле 'date' или 'batchId'.
-            // Таким образом, дата создания останется оригинальной.
             const updateData = { clientId, plantId, qty, price, status };
             if(status === 'done' && !orders.find(o=>o.id===id).completedDate) {
                 updateData.completedDate = new Date().toISOString();
@@ -516,13 +539,8 @@
             db.ref('orders/' + id).update(updateData).then(() => {
                 editingOrderId = null;
                 setSyncStatus('ok', '✅ Заказ обновлен');
-                renderOrders(); // Перерисует карточку в обычном виде
+                renderOrders();
             }).catch(error => alert('Ошибка: ' + error.message));
-        }
-
-        function cancelEditOrder() {
-            editingOrderId = null;
-            renderOrders(); // Просто перерисовываем, возвращая обычный вид
         }
 
         function deleteOrder(id) {
@@ -531,12 +549,87 @@
             }
         }
 
+        // ПУНКТ 1: Исправлена функция переключения статуса
+        function toggleStatus(id) {
+            const order = orders.find(o => o.id === id);
+            if (!order) return;
+            const newStatus = order.status === 'pending' ? 'done' : 'pending';
+            const updateData = { status: newStatus };
+            if(newStatus === 'done') updateData.completedDate = new Date().toISOString();
+            else updateData.completedDate = null;
+            
+            db.ref('orders/' + id).update(updateData)
+            .then(() => setSyncStatus('ok', '✅ Статус обновлен'))
+            .catch(error => alert('Ошибка: ' + error.message));
+        }
+
         function calculateTotal(orderList) {
             return orderList.reduce((sum, o) => sum + (o.qty * (o.price || 0)), 0);
         }
 
         function formatMoney(amount) {
             return amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽';
+        }
+
+        // ПУНКТ 3: Новый дизайн карточки заказа
+        function renderOrderCard(order) {
+            if (editingOrderId === order.id) {
+                const clientOptions = clients.map(c => `<option value="${c.id}" ${c.id === order.clientId ? 'selected' : ''}>${c.name}</option>`).join('');
+                const plantOptions = plants.map(p => `<option value="${p.id}" ${p.id === order.plantId ? 'selected' : ''}>${p.name}</option>`).join('');
+                return `
+                    <div class="card edit-order-form" data-order-card="${order.id}">
+                        <div style="font-weight:bold; margin-bottom:10px; color:var(--money);">✏️ Редактирование заказа</div>
+                        <label>Клиент:</label><select id="edit-ord-client">${clientOptions}</select>
+                        <label>Растение:</label><select id="edit-ord-plant">${plantOptions}</select>
+                        <div style="display:flex; gap:8px;">
+                            <div style="flex:1"><label>Кол-во:</label><input type="number" id="edit-ord-qty" value="${order.qty}" min="1"></div>
+                            <div style="flex:1"><label>Цена (₽):</label><input type="number" id="edit-ord-price" value="${order.price || 0}" min="0" step="0.01"></div>
+                        </div>
+                        <label>Статус:</label>
+                        <select id="edit-ord-status">
+                            <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>В работе</option>
+                            <option value="done" ${order.status === 'done' ? 'selected' : ''}>Выполнен</option>
+                        </select>
+                        <div class="edit-order-actions">
+                            <button class="btn-small btn-edit" data-save-order="${order.id}">💾 Сохранить</button>
+                            <button class="btn-small" style="background: var(--grey);" data-cancel-order="${order.id}">Отмена</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const client = clients.find(c => c.id === order.clientId);
+            const plant  = plants.find(p => p.id === order.plantId);
+            const clientName = client ? client.name : '🚫 Удалённый клиент';
+            const plantName  = plant  ? plant.name  : '🚫 Удалённое растение';
+            const dateStr = new Date(order.date).toLocaleDateString('ru-RU');
+            const timeStr = new Date(order.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+            const statusClass = order.status === 'done' ? 'status-done' : 'status-pending';
+            const statusText = order.status === 'done' ? 'Выполнен' : 'В работе';
+            const orderTotal = order.qty * (order.price || 0);
+
+            return `
+                <div class="card order-card" data-order-card="${order.id}">
+                    <div class="order-info">
+                        <div class="order-info-title">${clientName}</div>
+                        <div class="order-info-desc">🌱 ${plantName} | Кол-во: ${order.qty}</div>
+                        <div class="order-info-time">
+                            💰 Сумма: <span style="color:var(--money); font-weight:bold;">${formatMoney(orderTotal)}</span><br>
+                            📅 ${dateStr} ${timeStr}
+                        </div>
+                    </div>
+                    <div class="order-actions-col">
+                        <span class="status ${statusClass}">${statusText}</span>
+                        <div class="order-buttons">
+                            <button class="btn-icon btn-icon-toggle" data-toggle="${order.id}" title="${order.status === 'done' ? 'Вернуть в работу' : 'Выполнить'}">
+                                ${order.status === 'done' ? '↩️' : '✅'}
+                            </button>
+                            <button class="btn-icon btn-icon-edit" data-edit-order="${order.id}" title="Изменить">✏️</button>
+                            <button class="btn-icon btn-icon-delete" data-delete-order="${order.id}" title="Удалить">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         function renderOrders() {
@@ -576,7 +669,7 @@
                         const clientName = client ? client.name : '🚫 Удалённый клиент';
                         const clientOrders = groupedByClient[clientId];
                         html += `<div class="group-subheader"><span>👤 ${clientName}</span><span class="sum">${formatMoney(calculateTotal(clientOrders))}</span></div>`;
-                        clientOrders.forEach(o => { html += renderOrderCard(o, true); });
+                        clientOrders.forEach(o => { html += `<div class="group-item">${renderOrderCard(o)}</div>`; });
                     });
                 });
             } else if (groupBy === 'client') {
@@ -594,98 +687,44 @@
                         const plantName = plant ? plant.name : '🚫 Удалённое растение';
                         const plantOrders = groupedByPlant[plantId];
                         html += `<div class="group-subheader"><span>🌱 ${plantName}</span><span class="sum">${formatMoney(calculateTotal(plantOrders))}</span></div>`;
-                        plantOrders.forEach(o => { html += renderOrderCard(o, true); });
+                        plantOrders.forEach(o => { html += `<div class="group-item">${renderOrderCard(o)}</div>`; });
                     });
                 });
             } else {
                 html += `<div class="total-sum">💰 Итого: ${formatMoney(calculateTotal(filtered))}</div>`;
-                filtered.forEach(o => { html += renderOrderCard(o, false); });
+                filtered.forEach(o => { html += renderOrderCard(o); });
             }
             list.innerHTML = html;
-        }
-
-        function renderOrderCard(order, isGrouped) {
-            // Если этот заказ сейчас редактируется, возвращаем форму (хотя renderOrders и так это обрабатывает, это страховка)
-            if (editingOrderId === order.id) {
-                // Этот блок не должен срабатывать, если startEditOrder уже подменил innerHTML, 
-                // но на всякий случай оставим стандартный рендер, а редактирование управляется через DOM-манипуляции в startEditOrder.
-                // Чтобы избежать конфликтов, мы просто не будем рендерить его здесь, если он редактируется, 
-                // но так как мы делаем innerHTML замену в startEditOrder, нам нужно найти этот элемент.
-                // Упрощение: просто вернем обычную карточку, а startEditOrder найдет её по data-атрибуту и заменит.
-            }
-
-            const client = clients.find(c => c.id === order.clientId);
-            const plant  = plants.find(p => p.id === order.plantId);
-            const clientName = client ? client.name : '🚫 Удалённый клиент';
-            const plantName  = plant  ? plant.name  : '🚫 Удалёاенное растение';
-            const dateStr = new Date(order.date).toLocaleDateString('ru-RU');
-            const timeStr = new Date(order.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
-            const statusClass = order.status === 'done' ? 'status-done' : 'status-pending';
-            const statusText = order.status === 'done' ? 'Выполнен' : 'В работе';
-            const orderTotal = order.qty * (order.price || 0);
-
-            const className = isGrouped ? 'card group-item' : 'card';
-
-            return `
-                <div class="${className}" data-order-card="${order.id}">
-                    <div class="order-header">
-                        <strong>${isGrouped ? `Кол-во: ${order.qty}` : clientName}</strong>
-                        <span class="status ${statusClass}">${statusText}</span>
-                    </div>
-                    <div style="margin-bottom: 10px; color: var(--grey); font-size: 14px;">
-                        ${!isGrouped ? `🌱 ${plantName}<br>` : ''}
-                        💰 Цена: ${formatMoney(order.price || 0)} | Сумма: <span class="order-price">${formatMoney(orderTotal)}</span><br>
-                        📅 ${dateStr} ${timeStr}
-                    </div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="btn-small" data-toggle="${order.id}" style="flex:1; min-width: 100px;">
-                            ${order.status === 'done' ? '↩️ В работу' : '✅ Выполнить'}
-                        </button>
-                        <button class="btn-edit" data-edit-order="${order.id}" style="flex:1; min-widthА: 80px;">✏️ Изменить</button>
-                        <button class="btn-danger" data-delete-order="${order.id}" style="flex:0; min-width: 40px;">🗑️</button>
-                    </div>
-                </div>
-            `;
         }
 
         // --- ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ СОБЫТИЙ ---
         document.addEventListener('click', function(e) {
             const target = e.target;
             
-            // Вкладки
             if(target.classList.contains('tab')) { switchTab(target.getAttribute('data-tab')); return; }
             
-            // Клиенты
             if(target.id === 'btn-save-client') { saveClient(); return; }
             if(target.id === 'btn-cancel-client') { cancelEditClient(); return; }
             if(target.hasAttribute('data-edit-client')) { editClient(parseInt(target.getAttribute('data-edit-client'))); return; }
             if(target.hasAttribute('data-delete-client')) { deleteClient(parseInt(target.getAttribute('data-delete-client'))); return; }
             
-            // Растения
             if(target.id === 'btn-save-plant') { savePlant(); return; }
             if(target.id === 'btn-cancel-plant') { cancelEditPlant(); return; }
             if(target.hasAttribute('data-edit-plant')) { editPlant(parseInt(target.getAttribute('data-edit-plant'))); return; }
             if(target.hasAttribute('data-delete-plant')) { deletePlant(parseInt(target.getAttribute('data-delete-plant'))); return; }
             
-            // Заказы (создание)
             if(target.id === 'btn-add-order') { addOrder(); return; }
             if(target.id === 'btn-add-item') { addOrderItem(); return; }
             if(target.hasAttribute('data-remove-item')) { removeOrderItem(parseInt(target.getAttribute('data-remove-item'))); return; }
             
-            // Заказы (действия с карточкой)
-            if(target.hasAttribute('data-edit-order')) { 
-                startEditOrder(parseInt(target.getAttribute('data-edit-order'))); 
+            // ПУНКТ 1: Надежная обработка кнопки выполнения
+            if(target.hasAttribute('data-toggle')) { 
+                toggleStatus(parseInt(target.getAttribute('data-toggle'))); 
                 return; 
             }
-            if(target.hasAttribute('data-save-order')) { 
-                saveOrderEdit(parseInt(target.getAttribute('data-save-order'))); 
-                return; 
-            }
-            if(target.hasAttribute('data-cancel-order')) { 
-                cancelEditOrder(); 
-                return; 
-            }
-            if(target.hasAttribute('data-toggle')) { toggleStatus(parseInt(target.getAttribute('data-toggle'))); return; }
+            if(target.hasAttribute('data-edit-order')) { startEditOrder(parseInt(target.getAttribute('data-edit-order'))); return; }
+            if(target.hasAttribute('data-save-order')) { saveOrderEdit(parseInt(target.getAttribute('data-save-order'))); return; }
+            if(target.hasAttribute('data-cancel-order')) { cancelEditOrder(); return; }
             if(target.hasAttribute('data-delete-order')) { deleteOrder(parseInt(target.getAttribute('data-delete-order'))); return; }
         });
 
