@@ -1,0 +1,15 @@
+old
+{
+  "rules": {
+    ".read": "now < 1782932400000",  // 2026-7-2
+    ".write": "now < 1782932400000",  // 2026-7-2
+  }
+}
+
+new
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null"
+  }
+}
