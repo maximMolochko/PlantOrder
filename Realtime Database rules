@@ -13,3 +13,16 @@ new
     ".write": "auth != null"
   }
 }
+
+или
+{
+  "rules": {
+    "some_path": {
+      "$uid": {
+        // Allow only authenticated content owners access to their data
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid"
+      }
+    }
+  }
+}
