@@ -7,6 +7,7 @@
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     
     <style>
         :root { --primary: #1976d2; --bg: #f5f5f5; --card: #fff; --text: #333; --danger: #d32f2f; --grey: #757575; --success: #388e3c; --warning: #f57c00; }
@@ -29,8 +30,10 @@
         .empty { text-align: center; color: var(--grey); padding: 20px; }
         .row { display: flex; gap: 10px; }
         .row > * { flex: 1; margin-bottom: 10px; }
-        
-        /* Активный таймер */
+        .sync-status { position: fixed; top: 10px; right: 10px; padding: 5px 10px; background: #fff; border-radius: 20px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 200; }
+        .sync-ok { color: var(--success); }
+        .sync-error { color: var(--danger); }
+        .sync-wait { color: #f57c00; }
         .active-timer-card { background: #e3f2fd; border: 2px solid var(--primary); text-align: center; animation: pulse 2s infinite; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4); }
@@ -40,8 +43,6 @@
         .timer-display { font-size: 48px; font-weight: bold; color: var(--primary); margin: 15px 0; font-variant-numeric: tabular-nums; }
         .timer-info { font-size: 16px; color: var(--text); margin-bottom: 15px; }
         .timer-info strong { display: block; font-size: 18px; margin-bottom: 5px; }
-
-        /* Карточки задач */
         .recent-task-card { padding: 12px; margin-bottom: 10px; border-left: 4px solid var(--success); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
         .task-info { flex: 1; min-width: 0; }
         .task-info-title { font-weight: bold; margin-bottom: 4px; word-wrap: break-word; }
@@ -53,17 +54,12 @@
         .btn-icon { width: 36px; height: 36px; padding: 0; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; transition: 0.2s; }
         .btn-icon:active { transform: scale(0.9); }
         .btn-icon-delete { background: #ffebee; border-color: #ffcdd2; }
-        .btn-icon-delete:active { background: #ffcdd2; }
-
-        /* Форма редактирования задачи */
         .edit-task-form { background: #fff3e0; padding: 12px; border-radius: 6px; border: 2px solid var(--warning); width: 100%; }
         .edit-task-form label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; margin-top: 8px; font-weight: bold;}
         .edit-task-form label:first-child { margin-top: 0; }
         .edit-task-form select, .edit-task-form input { margin-bottom: 8px; }
         .edit-task-actions { display: flex; gap: 8px; margin-top: 12px; }
         .edit-task-actions button { flex: 1; margin-bottom: 0; }
-
-        /* Таблица статистики */
         .stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
         .stats-table th, .stats-table td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
         .stats-table th { background: #f9f9f9; font-weight: bold; color: var(--grey); }
@@ -71,49 +67,32 @@
         .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         .filter-bar input { flex: 1; margin-bottom: 0; }
         .filter-bar button { flex: 0 0 auto; width: auto; margin-bottom: 0; padding: 12px 20px; }
-
-        /* КАЛЕНДАРЬ */
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .calendar-header h2 { margin: 0; font-size: 20px; }
         .calendar-nav { display: flex; gap: 10px; }
         .calendar-nav button { width: auto; padding: 8px 16px; margin: 0; }
-        
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
         .calendar-day-header { text-align: center; font-weight: bold; color: var(--grey); padding: 10px; font-size: 14px; }
-        .calendar-day { 
-            background: var(--card); border-radius: 8px; padding: 8px; min-height: 80px; 
-            border: 2px solid #e0e0e0; cursor: pointer; transition: 0.2s;
-            display: flex; flex-direction: column; justify-content: space-between;
-        }
+        .calendar-day { background: var(--card); border-radius: 8px; padding: 8px; min-height: 80px; border: 2px solid #e0e0e0; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; }
         .calendar-day:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2); }
-        .calendar-day.other-month { background: #f5f5f5; color: #bdbdbd; }
         .calendar-day.today { border-color: var(--success); border-width: 3px; }
         .calendar-day.has-hours { background: #e8f5e9; }
         .calendar-day-number { font-weight: bold; font-size: 16px; margin-bottom: 5px; }
         .calendar-day-hours { font-size: 12px; color: var(--primary); font-weight: bold; text-align: center; padding: 4px; background: rgba(25, 118, 210, 0.1); border-radius: 4px; }
-        .calendar-day.empty { background: transparent; border: none; min-height: 80px; }
-
-        /* Модальное окно деталей дня */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5); z-index: 1000;
-            display: none; align-items: center; justify-content: center;
-            padding: 20px;
-        }
+        .calendar-day.empty { background: transparent; border: none; min-height: 80px; cursor: default; }
+        .calendar-day.empty:hover { border-color: #e0e0e0; box-shadow: none; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal-overlay.active { display: flex; }
-        .modal-content {
-            background: var(--card); border-radius: 12px; padding: 20px;
-            max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto;
-        }
+        .modal-content { background: var(--card); border-radius: 12px; padding: 20px; max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .modal-header h3 { margin: 0; color: var(--primary); }
         .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--grey); width: auto; padding: 0; margin: 0; }
-        .day-details-list { margin-top: 15px; }
     </style>
 </head>
 <body>
 
-    <!-- ВКЛАДКА: ТРЕКЕР -->
+    <div id="sync-status" class="sync-status sync-wait">⏳ Подключение...</div>
+
     <div id="view-tracker" class="view active">
         <h1>🕒 Трекер времени</h1>
         
@@ -129,9 +108,7 @@
 
         <div id="new-task-form" class="card">
             <h3>▶️ Начать новую задачу</h3>
-            <select id="task-counterparty">
-                <option value="">— Выберите контрагента —</option>
-            </select>
+            <select id="task-counterparty"><option value="">— Выберите контрагента —</option></select>
             <input type="text" id="task-description" placeholder="Описание задачи (напр. Консультация)">
             <button id="btn-start" class="btn-success">▶️ Старт</button>
         </div>
@@ -156,7 +133,6 @@
         <div id="recent-tasks-list"></div>
     </div>
 
-    <!-- ВКЛАДКА: КОНТРАГЕНТЫ -->
     <div id="view-counterparties" class="view">
         <h1>🏢 Контрагенты</h1>
         <div class="card">
@@ -168,21 +144,18 @@
         <div id="cp-list"></div>
     </div>
 
-    <!-- ВКЛАДКА: КАЛЕНДАРЬ -->
     <div id="view-calendar" class="view">
         <h1>📅 Календарь</h1>
         <div class="card">
             <div class="calendar-header">
-                <button class="btn-small" id="calendar-prev" style="width: auto;">◀ Назад</button>
+                <button class="btn-small" id="calendar-prev" style="width: auto;">◀</button>
                 <h2 id="calendar-month-year"></h2>
-                <button class="btn-small" id="calendar-next" style="width: auto;">Вперед ▶</button>
+                <button class="btn-small" id="calendar-next" style="width: auto;">▶</button>
             </div>
             <div class="calendar-grid" id="calendar-grid"></div>
         </div>
-        <div id="calendar-details"></div>
     </div>
 
-    <!-- ВКЛАДКА: СТАТИСТИКА -->
     <div id="view-stats" class="view">
         <h1>📊 Статистика</h1>
         <div class="card">
@@ -192,26 +165,17 @@
                 <button id="btn-apply-filter" class="btn-small">OK</button>
             </div>
             <button id="btn-export-csv" class="btn-success" style="margin-bottom: 15px;">📥 Выгрузить в Excel (CSV)</button>
-            
             <div id="stats-content">
                 <table class="stats-table">
-                    <thead>
-                        <tr>
-                            <th>Контрагент</th>
-                            <th>Часы (дробные)</th>
-                            <th>Часы (чч:мм)</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Контрагент</th><th>Часы (дробные)</th><th>Часы (чч:мм)</th></tr></thead>
                     <tbody id="stats-tbody"></tbody>
                 </table>
             </div>
         </div>
-        
         <h2>Детализация за период</h2>
         <div id="details-list"></div>
     </div>
 
-    <!-- НИЖНЕЕ МЕНЮ -->
     <div class="tabs">
         <div class="tab active" data-tab="tracker">🕒 Трекер</div>
         <div class="tab" data-tab="counterparties">🏢 Контрагенты</div>
@@ -219,7 +183,6 @@
         <div class="tab" data-tab="stats">📊 Статистика</div>
     </div>
 
-    <!-- Модальное окно для деталей дня -->
     <div class="modal-overlay" id="day-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -227,7 +190,7 @@
                 <button class="modal-close" id="modal-close">&times;</button>
             </div>
             <div id="modal-day-total" style="font-weight: bold; color: var(--primary); margin-bottom: 10px;"></div>
-            <div class="day-details-list" id="modal-day-list"></div>
+            <div id="modal-day-list"></div>
         </div>
     </div>
 
@@ -244,24 +207,43 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const auth = firebase.auth();
 
         let counterparties = [];
         let timeEntries = [];
         let activeEntry = null;
         let timerInterval = null;
         let editingTaskId = null;
-        
-        // Календарь
         let currentCalendarDate = new Date();
 
-        function init() {
-            setDefaultDates();
-            
+        function setSyncStatus(status, message) {
+            const el = document.getElementById('sync-status');
+            el.className = 'sync-status sync-' + status;
+            el.textContent = message;
+        }
+
+        // ====== АУТЕНТИФИКАЦИЯ ======
+        auth.signInAnonymously().catch((error) => {
+            console.error('Ошибка входа:', error);
+            setSyncStatus('error', '❌ Ошибка подключения');
+        });
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('✅ Анонимный вход выполнен, UID:', user.uid);
+                startDataListeners();
+            } else {
+                console.log('⏳ Ожидание аутентификации...');
+            }
+        });
+
+        function startDataListeners() {
             db.ref('timetracker/counterparties').on('value', (snapshot) => {
                 counterparties = [];
                 const data = snapshot.val();
                 if (data) Object.keys(data).forEach(key => counterparties.push({ id: key, ...data[key] }));
                 counterparties.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+                setSyncStatus('ok', '✅ Синхронизировано');
                 renderCounterparties();
                 updateCounterpartySelects();
             });
@@ -271,10 +253,9 @@
                 const data = snapshot.val();
                 if (data) Object.keys(data).forEach(key => timeEntries.push({ id: key, ...data[key] }));
                 timeEntries.sort((a, b) => b.startTime - a.startTime);
-                
                 checkActiveTimer();
                 renderStats();
-                renderCalendar(); // Обновляем календарь при изменении данных
+                renderCalendar();
             });
         }
 
@@ -284,14 +265,13 @@
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
                 tab.classList.add('active');
                 document.getElementById('view-' + tab.dataset.tab).classList.add('active');
-                
                 if (tab.dataset.tab === 'stats') { editingTaskId = null; renderStats(); }
                 else if (tab.dataset.tab === 'tracker') { renderRecentTasks(); }
                 else if (tab.dataset.tab === 'calendar') { renderCalendar(); }
             });
         });
 
-        // ================= КОНТРАГЕНТЫ =================
+        // ====== КОНТРАГЕНТЫ ======
         document.getElementById('btn-add-cp').addEventListener('click', () => {
             const name = document.getElementById('cp-name').value.trim();
             if (!name) return alert('Введите название');
@@ -323,7 +303,7 @@
             document.getElementById('manual-counterparty').innerHTML = options;
         }
 
-        // ================= ТРЕКЕР =================
+        // ====== ТРЕКЕР ======
         document.getElementById('btn-start').addEventListener('click', () => {
             const cpId = document.getElementById('task-counterparty').value;
             const task = document.getElementById('task-description').value.trim();
@@ -402,7 +382,7 @@
             });
         });
 
-        // ================= КАЛЕНДАРЬ =================
+        // ====== КАЛЕНДАРЬ ======
         document.getElementById('calendar-prev').addEventListener('click', () => {
             currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
             renderCalendar();
@@ -416,75 +396,47 @@
         function renderCalendar() {
             const year = currentCalendarDate.getFullYear();
             const month = currentCalendarDate.getMonth();
-            
-            // Заголовок
             const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
             document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
             
-            // Дни недели
             const dayHeaders = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-            
-            // Первый день месяца и количество дней
             const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
             const daysInMonth = lastDay.getDate();
-            
-            // Корректировка для понедельника (0 = воскресенье в JS)
             let startDay = firstDay.getDay() - 1;
             if (startDay < 0) startDay = 6;
             
-            // Группировка задач по дням
             const hoursByDay = {};
             const today = new Date();
             
             timeEntries.forEach(entry => {
-                if (!entry.endTime) return; // Пропускаем активные задачи
-                
+                if (!entry.endTime) return;
                 const entryDate = new Date(entry.startTime);
                 const dateKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
-                
                 const durationHours = (entry.endTime - entry.startTime) / 3600000;
-                
-                if (!hoursByDay[dateKey]) {
-                    hoursByDay[dateKey] = { total: 0, entries: [] };
-                }
+                if (!hoursByDay[dateKey]) hoursByDay[dateKey] = { total: 0, entries: [] };
                 hoursByDay[dateKey].total += durationHours;
                 hoursByDay[dateKey].entries.push(entry);
             });
             
-            // Генерация календаря
             let html = '';
-            // Заголовки дней недели
-            dayHeaders.forEach(day => {
-                html += `<div class="calendar-day-header">${day}</div>`;
-            });
+            dayHeaders.forEach(day => { html += `<div class="calendar-day-header">${day}</div>`; });
+            for (let i = 0; i < startDay; i++) { html += `<div class="calendar-day empty"></div>`; }
             
-            // Пустые ячейки до первого дня
-            for (let i = 0; i < startDay; i++) {
-                html += `<div class="calendar-day empty"></div>`;
-            }
-            
-            // Дни месяца
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateKey = `${year}-${month}-${day}`;
                 const dayData = hoursByDay[dateKey];
                 const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
                 const hasHours = dayData && dayData.total > 0;
-                
                 let classes = 'calendar-day';
                 if (isToday) classes += ' today';
                 if (hasHours) classes += ' has-hours';
-                
                 const hoursDisplay = hasHours ? formatHours(dayData.total) : '';
-                
-                html += `
-                    <div class="${classes}" onclick="showDayDetails('${year}', '${month}', '${day}')">
-                        <div class="calendar-day-number">${day}</div>
-                        ${hoursDisplay ? `<div class="calendar-day-hours">${hoursDisplay}</div>` : ''}
-                    </div>
-                `;
+                html += `<div class="${classes}" onclick="showDayDetails('${year}', '${month}', '${day}')">
+                    <div class="calendar-day-number">${day}</div>
+                    ${hoursDisplay ? `<div class="calendar-day-hours">${hoursDisplay}</div>` : ''}
+                </div>`;
             }
-            
             document.getElementById('calendar-grid').innerHTML = html;
         }
 
@@ -498,47 +450,34 @@
         }
 
         window.showDayDetails = function(year, month, day) {
-            const dateKey = `${year}-${month}-${day}`;
             const dayEntries = timeEntries.filter(entry => {
                 if (!entry.endTime) return false;
                 const entryDate = new Date(entry.startTime);
-                return entryDate.getFullYear() == year && 
-                       entryDate.getMonth() == month && 
-                       entryDate.getDate() == day;
+                return entryDate.getFullYear() == year && entryDate.getMonth() == month && entryDate.getDate() == day;
             });
-            
             if (dayEntries.length === 0) return;
             
             const date = new Date(year, month, day);
             const dateStr = date.toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            
             document.getElementById('modal-day-title').textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
             
-            // Считаем общее время
             const totalHours = dayEntries.reduce((sum, e) => sum + (e.endTime - e.startTime) / 3600000, 0);
             document.getElementById('modal-day-total').textContent = `Всего: ${formatHours(totalHours)}`;
             
-            // Список задач
             const listHtml = dayEntries.map(entry => {
                 const cp = counterparties.find(c => c.id === entry.counterpartyId);
                 const cpName = cp ? cp.name : '❓ Удаленный';
                 const start = new Date(entry.startTime);
                 const end = new Date(entry.endTime);
                 const duration = (entry.endTime - entry.startTime) / 3600000;
-                
-                return `
-                    <div class="card" style="padding: 10px; margin-bottom: 8px;">
-                        <div style="font-weight: bold; margin-bottom: 4px;">${cpName}</div>
-                        <div style="font-size: 13px; color: var(--text); margin-bottom: 4px;">${entry.task}</div>
-                        <div style="font-size: 12px; color: var(--grey);">
-                            ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} – 
-                            ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            <span style="color: var(--primary); font-weight: bold; margin-left: 8px;">
-                                ${formatHours(duration)}
-                            </span>
-                        </div>
+                return `<div class="card" style="padding: 10px; margin-bottom: 8px;">
+                    <div style="font-weight: bold; margin-bottom: 4px;">${cpName}</div>
+                    <div style="font-size: 13px; color: var(--text); margin-bottom: 4px;">${entry.task}</div>
+                    <div style="font-size: 12px; color: var(--grey);">
+                        ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} – ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        <span style="color: var(--primary); font-weight: bold; margin-left: 8px;">${formatHours(duration)}</span>
                     </div>
-                `;
+                </div>`;
             }).join('');
             
             document.getElementById('modal-day-list').innerHTML = listHtml;
@@ -550,12 +489,10 @@
         });
 
         document.getElementById('day-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'day-modal') {
-                document.getElementById('day-modal').classList.remove('active');
-            }
+            if (e.target.id === 'day-modal') document.getElementById('day-modal').classList.remove('active');
         });
 
-        // ================= РЕДАКТИРОВАНИЕ И УДАЛЕНИЕ =================
+        // ====== РЕДАКТИРОВАНИЕ ======
         function formatDT(ts) {
             if (!ts) return '';
             const d = new Date(ts);
@@ -565,28 +502,21 @@
 
         function getEditTaskFormHTML(e) {
             const cpOptions = counterparties.map(c => `<option value="${c.id}" ${c.id === e.counterpartyId ? 'selected' : ''}>${c.name}</option>`).join('');
-            return `
-                <div class="card edit-task-form" data-task-id="${e.id}">
-                    <div style="font-weight:bold; margin-bottom:10px; color:var(--warning);">✏️ Редактирование записи</div>
-                    <label>Контрагент:</label>
-                    <select id="edit-task-cp">${cpOptions}</select>
-                    <label>Задача:</label>
-                    <input type="text" id="edit-task-desc" value="${e.task || ''}">
-                    <label>Начало:</label>
-                    <input type="datetime-local" id="edit-task-start" value="${formatDT(e.startTime)}">
-                    <label>Окончание (пусто = активно):</label>
-                    <input type="datetime-local" id="edit-task-end" value="${formatDT(e.endTime)}">
-                    <div class="edit-task-actions">
-                        <button class="btn-small btn-success" data-save-task="${e.id}">💾 Сохранить</button>
-                        <button class="btn-small" style="background: var(--grey);" data-cancel-task="${e.id}">Отмена</button>
-                    </div>
+            return `<div class="card edit-task-form" data-task-id="${e.id}">
+                <div style="font-weight:bold; margin-bottom:10px; color:var(--warning);">✏️ Редактирование записи</div>
+                <label>Контрагент:</label><select id="edit-task-cp">${cpOptions}</select>
+                <label>Задача:</label><input type="text" id="edit-task-desc" value="${e.task || ''}">
+                <label>Начало:</label><input type="datetime-local" id="edit-task-start" value="${formatDT(e.startTime)}">
+                <label>Окончание (пусто = активно):</label><input type="datetime-local" id="edit-task-end" value="${formatDT(e.endTime)}">
+                <div class="edit-task-actions">
+                    <button class="btn-small btn-success" data-save-task="${e.id}">💾 Сохранить</button>
+                    <button class="btn-small" style="background: var(--grey);" data-cancel-task="${e.id}">Отмена</button>
                 </div>
-            `;
+            </div>`;
         }
 
         function renderTaskCard(e) {
             if (editingTaskId === e.id) return getEditTaskFormHTML(e);
-
             const cp = counterparties.find(c => c.id === e.counterpartyId);
             const cpName = cp ? cp.name : '❓ Удаленный';
             const start = new Date(e.startTime);
@@ -595,31 +525,26 @@
             const h = Math.floor(durationMin / 60);
             const m = Math.round(durationMin % 60);
             const isActive = !e.endTime;
+            const timeStr = isActive ? `<span style="color:var(--success);">Идет...</span>` : `${h}ч ${String(m).padStart(2, '0')}м`;
 
-            const timeStr = isActive 
-                ? `<span style="color:var(--success);">Идет...</span>`
-                : `${h}ч ${String(m).padStart(2, '0')}м`;
-
-            return `
-                <div class="card recent-task-card" data-task-id="${e.id}">
-                    <div class="task-info">
-                        <div class="task-info-title">${cpName}</div>
-                        <div class="task-info-desc">${e.task}</div>
-                        <div class="task-info-time">
-                            📅 ${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            ${end ? ' – ' + end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ' <span style="color:var(--success);">(активно)</span>'}
-                            ${e.isManual ? '<br><span style="color:var(--warning);">(вручную)</span>' : ''}
-                        </div>
-                    </div>
-                    <div class="task-actions-col">
-                        <div class="task-duration">${timeStr}</div>
-                        <div class="task-buttons">
-                            <button class="btn-icon" data-edit-task="${e.id}" title="Изменить">✏️</button>
-                            <button class="btn-icon btn-icon-delete" data-delete-task="${e.id}" title="Удалить">🗑️</button>
-                        </div>
+            return `<div class="card recent-task-card" data-task-id="${e.id}">
+                <div class="task-info">
+                    <div class="task-info-title">${cpName}</div>
+                    <div class="task-info-desc">${e.task}</div>
+                    <div class="task-info-time">
+                        📅 ${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${end ? ' – ' + end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ' <span style="color:var(--success);">(активно)</span>'}
+                        ${e.isManual ? '<br><span style="color:var(--warning);">(вручную)</span>' : ''}
                     </div>
                 </div>
-            `;
+                <div class="task-actions-col">
+                    <div class="task-duration">${timeStr}</div>
+                    <div class="task-buttons">
+                        <button class="btn-icon" data-edit-task="${e.id}" title="Изменить">✏️</button>
+                        <button class="btn-icon btn-icon-delete" data-delete-task="${e.id}" title="Удалить">🗑️</button>
+                    </div>
+                </div>
+            </div>`;
         }
 
         function renderRecentTasks() {
@@ -627,33 +552,19 @@
             const completed = timeEntries.filter(e => e.endTime).sort((a, b) => b.startTime - a.startTime).slice(0, 10);
             const active = timeEntries.find(e => !e.endTime);
             const displayList = active ? [active, ...completed].slice(0, 10) : completed.slice(0, 10);
-
-            if (displayList.length === 0) {
-                list.innerHTML = '<div class="empty">Пока нет задач</div>';
-                return;
-            }
+            if (displayList.length === 0) { list.innerHTML = '<div class="empty">Пока нет задач</div>'; return; }
             list.innerHTML = displayList.map(e => renderTaskCard(e)).join('');
         }
 
         function deleteTask(id) {
             if (confirm('Удалить эту запись о времени?')) {
-                if (activeEntry && activeEntry.id === id) {
-                    stopTicking();
-                    activeEntry = null;
-                }
+                if (activeEntry && activeEntry.id === id) { stopTicking(); activeEntry = null; }
                 db.ref('timetracker/time_entries/' + id).remove();
             }
         }
 
-        function startEditTask(id) {
-            editingTaskId = id;
-            renderRecentTasks();
-        }
-
-        function cancelEditTask() {
-            editingTaskId = null;
-            renderRecentTasks();
-        }
+        function startEditTask(id) { editingTaskId = id; renderRecentTasks(); }
+        function cancelEditTask() { editingTaskId = null; renderRecentTasks(); }
 
         function saveTaskEdit(id) {
             const cpId = document.getElementById('edit-task-cp').value;
@@ -664,7 +575,6 @@
             const startTime = new Date(startVal).getTime();
             const endTime = endVal ? new Date(endVal).getTime() : null;
             if (endTime && endTime <= startTime) return alert('Время окончания должно быть позже начала');
-            
             db.ref('timetracker/time_entries/' + id).update({ counterpartyId: cpId, task: task, startTime: startTime, endTime: endTime }).then(() => {
                 editingTaskId = null;
                 checkActiveTimer();
@@ -679,7 +589,7 @@
             else if (target.hasAttribute('data-cancel-task')) cancelEditTask();
         });
 
-        // ================= СТАТИСТИКА =================
+        // ====== СТАТИСТИКА ======
         function setDefaultDates() {
             const today = new Date();
             const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -695,7 +605,6 @@
             startDate.setHours(0, 0, 0, 0);
             const endDate = new Date(document.getElementById('stat-end-date').value);
             endDate.setHours(23, 59, 59, 999);
-
             const filtered = timeEntries.filter(e => e.endTime && e.startTime >= startDate.getTime() && e.startTime <= endDate.getTime());
             const stats = {};
             let totalMinutes = 0;
@@ -764,7 +673,7 @@
             document.body.removeChild(link);
         });
 
-        init();
+        setDefaultDates();
     </script>
 </body>
 </html>
