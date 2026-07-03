@@ -35,7 +35,6 @@
         .sync-error { color: var(--danger); }
         .sync-wait { color: #f57c00; }
         
-        /* Активный таймер */
         .active-timer-card { background: #e3f2fd; border: 2px solid var(--primary); text-align: center; }
         .active-timer-card.running { animation: pulse 2s infinite; }
         .active-timer-card.paused { background: #fff3e0; border-color: var(--warning); animation: none; }
@@ -54,7 +53,6 @@
         .timer-buttons { display: flex; gap: 10px; }
         .timer-buttons button { flex: 1; margin-bottom: 0; padding: 15px; font-size: 16px; }
 
-        /* Карточки задач */
         .recent-task-card { padding: 12px; margin-bottom: 10px; border-left: 4px solid var(--success); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
         .task-info { flex: 1; min-width: 0; }
         .task-info-title { font-weight: bold; margin-bottom: 4px; word-wrap: break-word; }
@@ -67,7 +65,6 @@
         .btn-icon:active { transform: scale(0.9); }
         .btn-icon-delete { background: #ffebee; border-color: #ffcdd2; }
 
-        /* Форма редактирования */
         .edit-task-form { background: #fff3e0; padding: 12px; border-radius: 6px; border: 2px solid var(--warning); width: 100%; }
         .edit-task-form label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; margin-top: 8px; font-weight: bold;}
         .edit-task-form label:first-child { margin-top: 0; }
@@ -75,7 +72,6 @@
         .edit-task-actions { display: flex; gap: 8px; margin-top: 12px; }
         .edit-task-actions button { flex: 1; margin-bottom: 0; }
 
-        /* Таблица статистики */
         .stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
         .stats-table th, .stats-table td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
         .stats-table th { background: #f9f9f9; font-weight: bold; color: var(--grey); }
@@ -84,7 +80,6 @@
         .filter-bar input { flex: 1; margin-bottom: 0; }
         .filter-bar button { flex: 0 0 auto; width: auto; margin-bottom: 0; padding: 12px 20px; }
 
-        /* Календарь */
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .calendar-header h2 { margin: 0; font-size: 20px; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
@@ -110,11 +105,9 @@
 
     <div id="sync-status" class="sync-status sync-wait">⏳ Подключение...</div>
 
-    <!-- ВКЛАДКА: ТРЕКЕР -->
     <div id="view-tracker" class="view active">
         <h1>🕒 Трекер времени</h1>
         
-        <!-- Активный таймер -->
         <div id="active-timer" class="card active-timer-card running" style="display: none;">
             <h3>⏱️ Идет работа</h3>
             <div id="timer-status-label" class="timer-status-label timer-status-running">▶ АКТИВНО</div>
@@ -129,7 +122,6 @@
             </div>
         </div>
 
-        <!-- Форма новой задачи -->
         <div id="new-task-form" class="card">
             <h3>▶️ Начать новую задачу</h3>
             <select id="task-counterparty"><option value="">— Выберите контрагента —</option></select>
@@ -157,7 +149,6 @@
         <div id="recent-tasks-list"></div>
     </div>
 
-    <!-- ВКЛАДКА: КОНТРАГЕНТЫ -->
     <div id="view-counterparties" class="view">
         <h1>🏢 Контрагенты</h1>
         <div class="card">
@@ -169,7 +160,6 @@
         <div id="cp-list"></div>
     </div>
 
-    <!-- ВКЛАДКА: КАЛЕНДАРЬ -->
     <div id="view-calendar" class="view">
         <h1>📅 Календарь</h1>
         <div class="card">
@@ -182,7 +172,6 @@
         </div>
     </div>
 
-    <!-- ВКЛАДКА: СТАТИСТИКА -->
     <div id="view-stats" class="view">
         <h1>📊 Статистика</h1>
         <div class="card">
@@ -203,7 +192,6 @@
         <div id="details-list"></div>
     </div>
 
-    <!-- НИЖНЕЕ МЕНЮ -->
     <div class="tabs">
         <div class="tab active" data-tab="tracker">🕒 Трекер</div>
         <div class="tab" data-tab="counterparties">🏢 Контрагенты</div>
@@ -277,12 +265,50 @@
                 timeEntries = [];
                 const data = snapshot.val();
                 if (data) Object.keys(data).forEach(key => timeEntries.push({ id: key, ...data[key] }));
-                timeEntries.sort((a, b) => b.startTime - a.startTime);
+                timeEntries.sort((a, b) => getEntryStartTime(b) - getEntryStartTime(a));
                 checkActiveTimer();
                 renderStats();
                 renderCalendar();
                 setSyncStatus('ok', '✅ Синхронизировано');
             });
+        }
+
+        // ====== КЛЮЧЕВЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С ВРЕМЕНЕМ ======
+        
+        /**
+        * Безопасно получить время начала записи.
+        * Если startTime отсутствует, вычисляем его из endTime и totalDuration.
+        */
+        function getEntryStartTime(entry) {
+            if (entry.startTime) return entry.startTime;
+            // Если startTime отсутствует, вычисляем реальное время начала
+            if (entry.endTime && entry.totalDuration) {
+                return entry.endTime - entry.totalDuration;
+            }
+            // Для старых записей без totalDuration
+            if (entry.endTime && entry.pausedDuration) {
+                return entry.endTime - entry.pausedDuration;
+            }
+            if (entry.endTime) return entry.endTime;
+            return Date.now();
+        }
+
+        /**
+         * Получить длительность записи в миллисекундах.
+         * Учитывает паузы и активные задачи.
+         */
+        function getEntryDuration(entry) {
+            // Если есть финальная длительность — используем её
+            if (entry.totalDuration) return entry.totalDuration;
+            // Если задача завершена без totalDuration (старые записи)
+            if (entry.endTime && entry.startTime) return entry.endTime - entry.startTime;
+            if (entry.endTime && entry.pausedDuration) return entry.pausedDuration;
+            // Активная задача — считаем динамически
+            let elapsed = entry.pausedDuration || 0;
+            if (!entry.isPaused && entry.startTime) {
+                elapsed += Date.now() - entry.startTime;
+            }
+            return elapsed;
         }
 
         // ====== НАВИГАЦИЯ ======
@@ -330,7 +356,7 @@
             document.getElementById('manual-counterparty').innerHTML = options;
         }
 
-        // ====== ТРЕКЕР (С ПАУЗОЙ) ======
+        // ====== ТРЕКЕР (ИСПРАВЛЕННАЯ ЛОГИКА ПАУЗЫ) ======
         document.getElementById('btn-start').addEventListener('click', () => {
             const cpId = document.getElementById('task-counterparty').value;
             const task = document.getElementById('task-description').value.trim();
@@ -346,24 +372,25 @@
             }).then(() => { document.getElementById('task-description').value = ''; });
         });
 
-        // Кнопка ПАУЗА / ВОЗОБНОВИТЬ
+        // Кнопка ПАУЗА / ВОЗОБНОВИТЬ — ИСПРАВЛЕННАЯ ВЕРСИЯ
         document.getElementById('btn-pause').addEventListener('click', () => {
             if (!activeEntry) return;
             
             if (activeEntry.isPaused) {
-                // Возобновление
+                // ВОЗОБНОВЛЕНИЕ: обновляем startTime на текущее время
                 db.ref('timetracker/time_entries/' + activeEntry.id).update({
                     isPaused: false,
                     startTime: Date.now()
                 });
             } else {
-                // Пауза
-                const currentElapsed = Date.now() - activeEntry.startTime;
+                // ПАУЗА: считаем накопленное время, НО НЕ обнуляем startTime!
+                // startTime остаётся временем последнего активного сегмента
+                const currentElapsed = Date.now() - (activeEntry.startTime || Date.now());
                 const totalPaused = (activeEntry.pausedDuration || 0) + currentElapsed;
                 db.ref('timetracker/time_entries/' + activeEntry.id).update({
                     isPaused: true,
-                    pausedDuration: totalPaused,
-                    startTime: null
+                    pausedDuration: totalPaused
+                    // startTime НЕ трогаем — он остаётся для определения дня задачи
                 });
             }
         });
@@ -378,7 +405,8 @@
             
             db.ref('timetracker/time_entries/' + activeEntry.id).update({
                 endTime: Date.now(),
-                totalDuration: totalDuration
+                totalDuration: totalDuration,
+                isPaused: false  // Сбрасываем флаг паузы при остановке
             });
         });
 
@@ -486,13 +514,6 @@
             renderCalendar();
         });
 
-        function getEntryDuration(entry) {
-            if (entry.totalDuration) return entry.totalDuration;
-            if (entry.endTime && entry.startTime) return entry.endTime - entry.startTime;
-            if (entry.pausedDuration) return entry.pausedDuration;
-            return 0;
-        }
-
         function renderCalendar() {
             const year = currentCalendarDate.getFullYear();
             const month = currentCalendarDate.getMonth();
@@ -510,8 +531,9 @@
             const today = new Date();
             
             timeEntries.forEach(entry => {
-                if (!entry.endTime) return;
-                const entryDate = new Date(entry.startTime);
+                if (!entry.endTime) return; // Только завершённые задачи
+                // ИСПОЛЬЗУЕМ безопасную функцию для получения времени
+                const entryDate = new Date(getEntryStartTime(entry));
                 const dateKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
                 const durationHours = getEntryDuration(entry) / 3600000;
                 if (!hoursByDay[dateKey]) hoursByDay[dateKey] = { total: 0, entries: [] };
@@ -552,7 +574,7 @@
         window.showDayDetails = function(year, month, day) {
             const dayEntries = timeEntries.filter(entry => {
                 if (!entry.endTime) return false;
-                const entryDate = new Date(entry.startTime);
+                const entryDate = new Date(getEntryStartTime(entry));
                 return entryDate.getFullYear() == year && entryDate.getMonth() == month && entryDate.getDate() == day;
             });
             if (dayEntries.length === 0) return;
@@ -567,14 +589,15 @@
             const listHtml = dayEntries.map(entry => {
                 const cp = counterparties.find(c => c.id === entry.counterpartyId);
                 const cpName = cp ? cp.name : '❓ Удаленный';
-                const start = new Date(entry.startTime);
-                const end = new Date(entry.endTime);
+                const start = new Date(getEntryStartTime(entry));
+                const end = entry.endTime ? new Date(entry.endTime) : null;
                 const duration = getEntryDuration(entry) / 3600000;
                 return `<div class="card" style="padding: 10px; margin-bottom: 8px;">
                     <div style="font-weight: bold; margin-bottom: 4px;">${cpName}</div>
                     <div style="font-size: 13px; color: var(--text); margin-bottom: 4px;">${entry.task}</div>
                     <div style="font-size: 12px; color: var(--grey);">
-                        ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} – ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${end ? ' – ' + end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                         <span style="color: var(--primary); font-weight: bold; margin-left: 8px;">${formatHours(duration)}</span>
                     </div>
                 </div>`;
@@ -619,7 +642,7 @@
             if (editingTaskId === e.id) return getEditTaskFormHTML(e);
             const cp = counterparties.find(c => c.id === e.counterpartyId);
             const cpName = cp ? cp.name : '❓ Удаленный';
-            const start = new Date(e.startTime);
+            const start = new Date(getEntryStartTime(e));
             const end = e.endTime ? new Date(e.endTime) : null;
             const durationMs = getEntryDuration(e);
             const durationMin = durationMs / 60000;
@@ -655,7 +678,7 @@
 
         function renderRecentTasks() {
             const list = document.getElementById('recent-tasks-list');
-            const completed = timeEntries.filter(e => e.endTime).sort((a, b) => b.startTime - a.startTime).slice(0, 10);
+            const completed = timeEntries.filter(e => e.endTime).sort((a, b) => getEntryStartTime(b) - getEntryStartTime(a)).slice(0, 10);
             const active = timeEntries.find(e => !e.endTime);
             const displayList = active ? [active, ...completed].slice(0, 10) : completed.slice(0, 10);
             if (displayList.length === 0) { list.innerHTML = '<div class="empty">Пока нет задач</div>'; return; }
@@ -719,7 +742,11 @@
             startDate.setHours(0, 0, 0, 0);
             const endDate = new Date(document.getElementById('stat-end-date').value);
             endDate.setHours(23, 59, 59, 999);
-            const filtered = timeEntries.filter(e => e.endTime && e.startTime >= startDate.getTime() && e.startTime <= endDate.getTime());
+            const filtered = timeEntries.filter(e => {
+                if (!e.endTime) return false;
+                const startTime = getEntryStartTime(e);
+                return startTime >= startDate.getTime() && startTime <= endDate.getTime();
+            });
             const stats = {};
             let totalMinutes = 0;
 
@@ -760,7 +787,11 @@
             startDate.setHours(0, 0, 0, 0);
             const endDate = new Date(document.getElementById('stat-end-date').value);
             endDate.setHours(23, 59, 59, 999);
-            const filtered = timeEntries.filter(e => e.endTime && e.startTime >= startDate.getTime() && e.startTime <= endDate.getTime());
+            const filtered = timeEntries.filter(e => {
+                if (!e.endTime) return false;
+                const startTime = getEntryStartTime(e);
+                return startTime >= startDate.getTime() && startTime <= endDate.getTime();
+            });
             if (filtered.length === 0) return alert('Нет данных для выгрузки');
 
             let csvContent = "\uFEFFКонтрагент;Задача;Дата;Начало;Конец;Часы (дробные);Часы (чч:мм)\n";
@@ -768,13 +799,13 @@
                 const cp = counterparties.find(c => c.id === e.counterpartyId);
                 const cpName = cp ? cp.name.replace(/;/g, ',') : 'Удаленный';
                 const task = (e.task || '').replace(/;/g, ',').replace(/\n/g, ' ');
-                const start = new Date(e.startTime);
-                const end = new Date(e.endTime);
+                const start = new Date(getEntryStartTime(e));
+                const end = e.endTime ? new Date(e.endTime) : null;
                 const durationMin = getEntryDuration(e) / 60000;
                 const hoursDecimal = (durationMin / 60).toFixed(2);
                 const h = Math.floor(durationMin / 60);
                 const m = Math.round(durationMin % 60);
-                csvContent += `${cpName};${task};${start.toLocaleDateString('ru-RU')};${start.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})};${end.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})};${hoursDecimal};${h}ч ${String(m).padStart(2, '0')}м\n`;
+                csvContent += `${cpName};${task};${start.toLocaleDateString('ru-RU')};${start.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})};${end ? end.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}) : ''};${hoursDecimal};${h}ч ${String(m).padStart(2, '0')}м\n`;
             });
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
