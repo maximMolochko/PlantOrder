@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head> 
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Трекер Времени</title>
@@ -273,40 +273,36 @@
             });
         }
 
-        // ====== КЛЮЧЕВЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С ВРЕМЕНЕМ ======
+        // ====== КЛЮЧЕВЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С ВРЕМЕНЕМ (ИСПРАВЛЕННЫЕ) ======
         
         /**
         * Безопасно получить время начала записи.
-        * Если startTime отсутствует, вычисляем его из endTime и totalDuration.
+        * Приоритет отдаем новому полю originalStartTime, чтобы паузы не ломали календарь.
         */
         function getEntryStartTime(entry) {
+            if (entry.originalStartTime) return entry.originalStartTime;
             if (entry.startTime) return entry.startTime;
-            // Если startTime отсутствует, вычисляем реальное время начала
-            if (entry.endTime && entry.totalDuration) {
-                return entry.endTime - entry.totalDuration;
-            }
-            // Для старых записей без totalDuration
-            if (entry.endTime && entry.pausedDuration) {
-                return entry.endTime - entry.pausedDuration;
-            }
+            if (entry.endTime && entry.totalDuration) return entry.endTime - entry.totalDuration;
+            if (entry.endTime && entry.pausedDuration) return entry.endTime - entry.pausedDuration;
             if (entry.endTime) return entry.endTime;
             return Date.now();
         }
 
         /**
          * Получить длительность записи в миллисекундах.
-         * Учитывает паузы и активные задачи.
+         * Учитывает паузы, active задания и новые поля.
          */
         function getEntryDuration(entry) {
-            // Если есть финальная длительность — используем её
             if (entry.totalDuration) return entry.totalDuration;
-            // Если задача завершена без totalDuration (старые записи)
+            if (entry.endTime && entry.originalStartTime) return entry.endTime - entry.originalStartTime;
             if (entry.endTime && entry.startTime) return entry.endTime - entry.startTime;
             if (entry.endTime && entry.pausedDuration) return entry.pausedDuration;
+            
             // Активная задача — считаем динамически
             let elapsed = entry.pausedDuration || 0;
-            if (!entry.isPaused && entry.startTime) {
-                elapsed += Date.now() - entry.startTime;
+            if (!entry.isPaused) {
+                const startPoint = entry.lastResumeTime || entry.startTime || Date.now();
+                elapsed += Date.now() - startPoint;
             }
             return elapsed;
         }
@@ -356,15 +352,19 @@
             document.getElementById('manual-counterparty').innerHTML = options;
         }
 
-        // ====== ТРЕКЕР (ИСПРАВЛЕННАЯ ЛОГИКА ПАУЗЫ) ======
+        // ====== ТРЕКЕР (ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ЛОГИКА) ======
         document.getElementById('btn-start').addEventListener('click', () => {
             const cpId = document.getElementById('task-counterparty').value;
             const task = document.getElementById('task-description').value.trim();
             if (!cpId) return alert('Выберите контрагента');
             if (!task) return alert('Введите описание задачи');
+            
+            const now = Date.now();
             db.ref('timetracker/time_entries').push({
                 counterpartyId: cpId, task: task, 
-                startTime: Date.now(), 
+                originalStartTime: now, // Реальное время первого старта (для календаря)
+                lastResumeTime: now,    // Время последнего снятия с паузы (для расчетов)
+                startTime: now,         // Оставляем для обратной совместимости
                 endTime: null, 
                 isManual: false,
                 pausedDuration: 0,
@@ -372,25 +372,24 @@
             }).then(() => { document.getElementById('task-description').value = ''; });
         });
 
-        // Кнопка ПАУЗА / ВОЗОБНОВИТЬ — ИСПРАВЛЕННАЯ ВЕРСИЯ
+        // Кнопка ПАУЗА / ВОЗОБНОВИТЬ
         document.getElementById('btn-pause').addEventListener('click', () => {
             if (!activeEntry) return;
             
             if (activeEntry.isPaused) {
-                // ВОЗОБНОВЛЕНИЕ: обновляем startTime на текущее время
+                // ВОЗОБНОВЛЕНИЕ: просто запоминаем текущий момент как начало отрезка
                 db.ref('timetracker/time_entries/' + activeEntry.id).update({
                     isPaused: false,
-                    startTime: Date.now()
+                    lastResumeTime: Date.now()
                 });
             } else {
-                // ПАУЗА: считаем накопленное время, НО НЕ обнуляем startTime!
-                // startTime остаётся временем последнего активного сегмента
-                const currentElapsed = Date.now() - (activeEntry.startTime || Date.now());
-                const totalPaused = (activeEntry.pausedDuration || 0) + currentElapsed;
+                // ПАУЗА: считаем время от последнего возобновления и складываем в копилку
+                const currentSegment = Date.now() - (activeEntry.lastResumeTime || activeEntry.startTime || Date.now());
+                const newPausedDuration = (activeEntry.pausedDuration || 0) + currentSegment;
+                
                 db.ref('timetracker/time_entries/' + activeEntry.id).update({
                     isPaused: true,
-                    pausedDuration: totalPaused
-                    // startTime НЕ трогаем — он остаётся для определения дня задачи
+                    pausedDuration: newPausedDuration
                 });
             }
         });
@@ -399,14 +398,16 @@
             if (!activeEntry) return;
             
             let totalDuration = activeEntry.pausedDuration || 0;
-            if (!activeEntry.isPaused && activeEntry.startTime) {
-                totalDuration += Date.now() - activeEntry.startTime;
+            
+            // Если не на паузе, добавляем время текущего активного отрезка
+            if (!activeEntry.isPaused) {
+                totalDuration += Date.now() - (activeEntry.lastResumeTime || activeEntry.startTime || Date.now());
             }
             
             db.ref('timetracker/time_entries/' + activeEntry.id).update({
                 endTime: Date.now(),
                 totalDuration: totalDuration,
-                isPaused: false  // Сбрасываем флаг паузы при остановке
+                isPaused: false
             });
         });
 
@@ -460,8 +461,9 @@
         function updateTimerDisplay() {
             if (!activeEntry) return;
             let elapsed = activeEntry.pausedDuration || 0;
-            if (!activeEntry.isPaused && activeEntry.startTime) {
-                elapsed += Date.now() - activeEntry.startTime;
+            if (!activeEntry.isPaused) {
+                const startPoint = activeEntry.lastResumeTime || activeEntry.startTime || Date.now();
+                elapsed += Date.now() - startPoint;
             }
             const h = Math.floor(elapsed / 3600000);
             const m = Math.floor((elapsed % 3600000) / 60000);
@@ -494,7 +496,9 @@
             if (endTime <= startTime) return alert('Время окончания должно быть позже начала');
             const totalDuration = endTime - startTime;
             db.ref('timetracker/time_entries').push({ 
-                counterpartyId: cpId, task: task, startTime, endTime, 
+                counterpartyId: cpId, task: task, 
+                originalStartTime: startTime, // Добавлено для единообразия
+                startTime, endTime, 
                 isManual: true, pausedDuration: 0, isPaused: false,
                 totalDuration: totalDuration
             }).then(() => {
@@ -531,8 +535,7 @@
             const today = new Date();
             
             timeEntries.forEach(entry => {
-                if (!entry.endTime) return; // Только завершённые задачи
-                // ИСПОЛЬЗУЕМ безопасную функцию для получения времени
+                if (!entry.endTime) return; 
                 const entryDate = new Date(getEntryStartTime(entry));
                 const dateKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
                 const durationHours = getEntryDuration(entry) / 3600000;
@@ -629,7 +632,7 @@
                 <div style="font-weight:bold; margin-bottom:10px; color:var(--warning);">✏️ Редактирование записи</div>
                 <label>Контрагент:</label><select id="edit-task-cp">${cpOptions}</select>
                 <label>Задача:</label><input type="text" id="edit-task-desc" value="${e.task || ''}">
-                <label>Начало:</label><input type="datetime-local" id="edit-task-start" value="${formatDT(e.startTime)}">
+                <label>Начало:</label><input type="datetime-local" id="edit-task-start" value="${formatDT(getEntryStartTime(e))}">
                 <label>Окончание:</label><input type="datetime-local" id="edit-task-end" value="${formatDT(e.endTime)}">
                 <div class="edit-task-actions">
                     <button class="btn-small btn-success" data-save-task="${e.id}">💾 Сохранить</button>
@@ -705,11 +708,21 @@
             const endTime = endVal ? new Date(endVal).getTime() : null;
             if (endTime && endTime <= startTime) return alert('Время окончания должно быть позже начала');
             
-            const updateData = { counterpartyId: cpId, task: task, startTime: startTime, endTime: endTime };
+            const updateData = { counterpartyId: cpId, task: task, originalStartTime: startTime, startTime: startTime, endTime: endTime };
+            
             if (endTime) {
+                // Если задача завершена (есть конец) - считаем totalTime и сбрасываем паузы
                 updateData.totalDuration = endTime - startTime;
                 updateData.pausedDuration = 0;
                 updateData.isPaused = false;
+            } else {
+                // Если редактируют активную задачу (убрали конец) - сохраняем ее текущее состояние паузы
+                const originalEntry = timeEntries.find(e => e.id === id);
+                if (originalEntry) {
+                    updateData.pausedDuration = originalEntry.pausedDuration || 0;
+                    updateData.isPaused = originalEntry.isPaused || false;
+                    updateData.lastResumeTime = originalEntry.lastResumeTime || startTime;
+                }
             }
             
             db.ref('timetracker/time_entries/' + id).update(updateData).then(() => {
