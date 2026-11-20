@@ -6,7 +6,7 @@ from pydub import AudioSegment
 import speech_recognition as sr
 import os
 
-TOKEN = "7977883231:AAHbcUSdK5S7Um6k73V0JciBWNiDRE5jres"  # Замените на реальный токен
+TOKEN = ""  # Замените на реальный токен
 
 
 def convert_aac_to_format(input_aac_path: str, output_path: str):
