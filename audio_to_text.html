@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="description" content="Распознавание русской речи в браузере на базе Whisper. Бесплатно, без сервера, работает на телефоне.">
+<meta name="theme-color" content="#4f46e5">
+<title>Распознавание русской речи</title>
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --ok: #16a34a;
+    --err: #dc2626;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  header {
+    text-align: center;
+    padding: 16px 0 24px;
+  }
+  header h1 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 700;
+  }
+  header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: 13px;
+  }
+  select, input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: white;
+    margin-bottom: 12px;
+  }
+  input[type="file"] { display: none; }
+  button {
+    width: 100%;
+    padding: 14px 16px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+  }
+  button.secondary {
+    background: white;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  button.secondary:hover:not(:disabled) {
+    background: #eef2ff;
+  }
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .15s;
+    margin-bottom: 12px;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent);
+    background: #eef2ff;
+    color: var(--accent);
+  }
+  .drop-zone strong { color: var(--accent); }
+  audio {
+    width: 100%;
+    margin-top: 12px;
+  }
+  progress {
+    width: 100%;
+    height: 8px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  progress::-webkit-progress-bar {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  progress::-webkit-progress-value {
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width .2s;
+  }
+  .status {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 8px 0;
+  }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  .status .file {
+    font-size: 12px;
+    word-break: break-all;
+    display: block;
+    margin-top: 4px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 160px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    resize: vertical;
+    background: white;
+  }
+  .stats {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  footer {
+    text-align: center;
+    padding: 24px 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  @media (max-width: 480px) {
+    .container { padding: 12px; }
+    .card { padding: 16px; }
+    header h1 { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Распознавание русской речи</h1>
+    <p>Аудио в текст прямо в браузере. Бесплатно, без сервера.</p>
+  </header>
+
+  <!-- Шаг 1: Модель -->
+  <section class="card">
+    <h2><span class="num">1</span> Выбор модели</h2>
+    <select id="model">
+      <option value="Xenova/whisper-tiny">Tiny (~40 МБ) — быстро, ниже точность</option>
+      <option value="Xenova/whisper-base" selected>Base (~80 МБ) — баланс скорости и точности</option>
+      <option value="Xenova/whisper-small">Small (~240 МБ) — выше точность, дольше</option>
+    </select>
+    <button id="loadModel">Загрузить модель</button>
+    <div id="loadProgress" class="status"></div>
+  </section>
+
+  <!-- Шаг 2: Аудио -->
+  <section class="card">
+    <h2><span class="num">2</span> Аудиозапись</h2>
+    <div id="dropZone" class="drop-zone">
+      Перетащите аудио сюда или <strong>нажмите для выбора</strong>
+    </div>
+    <input type="file" id="fileInput" accept="audio/*">
+    <button id="recordBtn" class="secondary">Записать с микрофона</button>
+    <audio id="player" controls style="display:none"></audio>
+  </section>
+
+  <!-- Шаг 3: Распознавание -->
+  <section class="card">
+    <h2><span class="num">3</span> Распознавание</h2>
+    <button id="transcribeBtn" disabled>Распознать речь</button>
+    <div id="transcribeProgress" class="status"></div>
+  </section>
+
+  <!-- Шаг 4: Результат -->
+  <section class="card">
+    <h2><span class="num">4</span> Текст</h2>
+    <textarea id="result" placeholder="Здесь появится распознанный текст..."></textarea>
+    <div id="stats" class="stats"></div>
+    <div class="btn-row">
+      <button id="copyBtn" class="secondary">Копировать</button>
+      <button id="downloadBtn" class="secondary">Скачать .txt</button>
+    </div>
+  </section>
+
+  <footer>
+    Работает на <a href="https://github.com/xenova/transformers.js" target="_blank">Transformers.js</a>
+    и модели <a href="https://github.com/openai/whisper" target="_blank">Whisper</a>.
+    Аудио не покидает ваше устройство.
+  </footer>
+</div>
+
+<script type="module">
+  import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+  // Состояние приложения
+  let transcriber = null;
+  let currentModelName = null;
+  let audioBlob = null;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+
+  // DOM-элементы
+  const modelSelect     = document.getElementById('model');
+  const loadBtn         = document.getElementById('loadModel');
+  const loadProgress    = document.getElementById('loadProgress');
+  const dropZone        = document.getElementById('dropZone');
+  const fileInput       = document.getElementById('fileInput');
+  const recordBtn       = document.getElementById('recordBtn');
+  const player          = document.getElementById('player');
+  const transcribeBtn   = document.getElementById('transcribeBtn');
+  const transcribeProgress = document.getElementById('transcribeProgress');
+  const result          = document.getElementById('result');
+  const copyBtn         = document.getElementById('copyBtn');
+  const downloadBtn     = document.getElementById('downloadBtn');
+  const stats           = document.getElementById('stats');
+
+  // ===== Шаг 1: Загрузка модели =====
+  loadBtn.addEventListener('click', async () => {
+    const modelName = modelSelect.value;
+    if (currentModelName === modelName && transcriber) {
+      loadProgress.innerHTML = '<span class="ok">Модель уже загружена.</span>';
+      return;
+    }
+    loadBtn.disabled = true;
+    loadProgress.innerHTML = 'Загрузка модели (может занять несколько минут при первом запуске)...<progress></progress>';
+
+    try {
+      transcriber = await pipeline(
+        'automatic-speech-recognition',
+        modelName,
+        {
+          progress_callback: (data) => {
+            if (data.status === 'progress' && data.file) {
+              const pct = Math.round(data.progress || 0);
+              const fileName = data.file.split('/').pop();
+              loadProgress.innerHTML =
+                `<span>Загрузка: ${fileName}</span>
+                 <progress value="${pct}" max="100"></progress>
+                 <span>${pct}%</span>`;
+            } else if (data.status === 'ready') {
+              loadProgress.innerHTML = '<span class="ok">Модель готова к работе.</span>';
+            }
+          }
+        }
+      );
+      currentModelName = modelName;
+      transcribeBtn.disabled = !audioBlob;
+    } catch (e) {
+      loadProgress.innerHTML = `<span class="err">Ошибка загрузки: ${e.message}</span>`;
+    } finally {
+      loadBtn.disabled = false;
+    }
+  });
+
+  // ===== Шаг 2: Аудио (файл / drag&drop / микрофон) =====
+  function setAudio(blob, name) {
+    audioBlob = blob;
+    const url = URL.createObjectURL(blob);
+    player.src = url;
+    player.style.display = 'block';
+    const sizeKB = Math.round(blob.size / 1024);
+    dropZone.innerHTML = `Загружено: <strong>${name}</strong><br><small>${sizeKB} КБ · нажмите, чтобы заменить</small>`;
+    transcribeBtn.disabled = !transcriber;
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) setAudio(file, file.name);
+  });
+
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('audio/')) {
+      setAudio(file, file.name);
+    } else {
+      alert('Поддерживаются только аудиофайлы (mp3, wav, m4a, ogg, webm).');
+    }
+  });
+
+  // Запись с микрофона
+  recordBtn.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordedChunks = [];
+      // webm/opus — самый поддерживаемый формат в браузерах
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+      mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+        const time = new Date().toLocaleTimeString('ru-RU');
+        setAudio(blob, `Запись ${time}.webm`);
+        recordBtn.textContent = 'Записать с микрофона';
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorder.start();
+      recordBtn.textContent = '■ Остановить запись';
+    } catch (e) {
+      alert('Нет доступа к микрофону: ' + e.message + '\n\nНа iOS используйте Safari и разрешите доступ к микрофону.');
+    }
+  });
+
+  // ===== Шаг 3: Распознавание =====
+  transcribeBtn.addEventListener('click', async () => {
+    if (!transcriber || !audioBlob) return;
+    transcribeBtn.disabled = true;
+    transcribeProgress.innerHTML = 'Обработка аудио...<progress></progress>';
+
+    try {
+      const url = URL.createObjectURL(audioBlob);
+      const startTime = performance.now();
+      const output = await transcriber(url, {
+        language: 'russian',
+        task: 'transcribe',
+        chunk_length_s: 30,
+        stride_length_s: 5,
+      });
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+      result.value = output.text.trim();
+      updateStats();
+      transcribeProgress.innerHTML = `<span class="ok">Готово за ${elapsed} с.</span>`;
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      transcribeProgress.innerHTML = `<span class="err">Ошибка распознавания: ${e.message}</span>`;
+    } finally {
+      transcribeBtn.disabled = false;
+    }
+  });
+
+  // ===== Шаг 4: Работа с результатом =====
+  function updateStats() {
+    const text = result.value.trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    const chars = text.length;
+    stats.textContent = `${words} слов · ${chars} символов`;
+  }
+  result.addEventListener('input', updateStats);
+
+  copyBtn.addEventListener('click', async () => {
+    if (!result.value) return;
+    try {
+      await navigator.clipboard.writeText(result.value);
+      copyBtn.textContent = '✓ Скопировано';
+      setTimeout(() => (copyBtn.textContent = 'Копировать'), 1500);
+    } catch (e) {
+      result.select();
+      document.execCommand('copy');
+      copyBtn.textContent = '✓ Скопировано';
+      setTimeout(() => (copyBtn.textContent = 'Копировать'), 1500);
+    }
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    if (!result.value) return;
+    const blob = new Blob([result.value], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transcript_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+</script>
+</body>
+</html>
